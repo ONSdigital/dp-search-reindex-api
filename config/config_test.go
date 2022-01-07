@@ -42,6 +42,15 @@ func TestConfig(t *testing.T) {
 					TaskNameValues:   "dataset-api,zebedee",
 					SearchAPIURL:     "http://localhost:23900",
 					ServiceAuthToken: "",
+					KafkaConfig: KafkaConfig{
+						Brokers:                  []string{"localhost:9092"},
+						Version:                  "1.0.2",
+						SecProtocol:              "",
+						SecCACerts:               "",
+						SecClientCert:            "",
+						SecClientKey:             "",
+						SecSkipVerify:            false,
+					},
 				})
 			})
 
