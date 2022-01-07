@@ -55,15 +55,15 @@ if not then set one up by following these instructions: https://github.com/ONSdi
 | SERVICE_AUTH_TOKEN           | _unset_               | This is required to identify the Search Reindex API when it calls the Search API POST /search endpoint
 | KAFKA_ADDR                   | localhost:39092       | The kafka broker addresses (can be comma separated)
 | KAFKA_VERSION                | "1.0.2"               | The kafka version that this service expects to connect to
-| KAFKA_SEC_PROTO              | _unset_               | if set to `TLS`, kafka connections will use TLS (see notes for more info)
-| KAFKA_SEC_CA_CERTS           | _unset_               | CA cert chain for the server cert (see notes for more info)
-| KAFKA_SEC_CLIENT_KEY         | _unset_               | PEM for the client key (see notes for more info)
-| KAFKA_SEC_CLIENT_CERT        | _unset_               | PEM for the client certificate (see notes for more info)
-| KAFKA_SEC_SKIP_VERIFY        | false                 | ignores server certificate issues if `true` [see note](#note)
+| KAFKA_SEC_PROTO              | _unset_               | if set to `TLS`, kafka connections will use TLS [[1]](#note1)
+| KAFKA_SEC_CA_CERTS           | _unset_               | CA cert chain for the server cert [[1]](#note1)
+| KAFKA_SEC_CLIENT_KEY         | _unset_               | PEM for the client key [[1]](#note1)
+| KAFKA_SEC_CLIENT_CERT        | _unset_               | PEM for the client certificate [[1]](#note1)
+| KAFKA_SEC_SKIP_VERIFY        | false                 | ignores server certificate issues if `true` [[1]](#note1)
 
 **Notes:**
 
-* <a name="note"></a> For more info, see the [kafka TLS examples documentation](https://github.com/ONSdigital/dp-kafka/tree/main/examples#tls)
+<a name="note1"></a> 1. For more info, see the [kafka TLS examples documentation](https://github.com/ONSdigital/dp-kafka/tree/main/examples#tls)
 
 ### Testing
 
