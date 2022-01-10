@@ -88,6 +88,9 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 					return
 				}
 			}
+		} else {
+			//As the index name was updated successfully we can send a reindex-requested event
+			api.reindex.SendReindexRequestedEvent(api.cfg, id, newJob.SearchIndexName)
 		}
 	}
 

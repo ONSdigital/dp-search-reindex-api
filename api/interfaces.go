@@ -7,6 +7,7 @@ import (
 
 	"github.com/ONSdigital/dp-authorisation/auth"
 	dpHTTP "github.com/ONSdigital/dp-net/http"
+	"github.com/ONSdigital/dp-search-reindex-api/config"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
 )
 
@@ -41,4 +42,5 @@ type AuthHandler interface {
 type Indexer interface {
 	CreateIndex(ctx context.Context, serviceAuthToken, searchAPISearchURL string, httpClient dpHTTP.Clienter) (*http.Response, error)
 	GetIndexNameFromResponse(ctx context.Context, body io.ReadCloser) (string, error)
+	SendReindexRequestedEvent(cfg *config.Config, jobID string, indexName string) error
 }

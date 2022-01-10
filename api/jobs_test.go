@@ -70,6 +70,9 @@ func TestCreateJobHandler(t *testing.T) {
 		GetIndexNameFromResponseFunc: func(ctx context.Context, body io.ReadCloser) (string, error) {
 			return "ons1638363874110115", nil
 		},
+		SendReindexRequestedEventFunc: func(cfg *config.Config, jobID string, indexName string) error {
+			return nil
+		},
 	}
 
 	Convey("Given a Search Reindex Job API that can create valid search reindex jobs and store their details in a Data Store", t, func() {

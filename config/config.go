@@ -40,13 +40,14 @@ type MongoConfig struct {
 
 // KafkaConfig contains the config required to connect to Kafka
 type KafkaConfig struct {
-	Brokers                  []string `envconfig:"KAFKA_ADDR"                            json:"-"`
-	Version                  string   `envconfig:"KAFKA_VERSION"`
-	SecProtocol              string   `envconfig:"KAFKA_SEC_PROTO"`
-	SecCACerts               string   `envconfig:"KAFKA_SEC_CA_CERTS"`
-	SecClientKey             string   `envconfig:"KAFKA_SEC_CLIENT_KEY"                  json:"-"`
-	SecClientCert            string   `envconfig:"KAFKA_SEC_CLIENT_CERT"`
-	SecSkipVerify            bool     `envconfig:"KAFKA_SEC_SKIP_VERIFY"`
+	Brokers               []string `envconfig:"KAFKA_ADDR"                            json:"-"`
+	Version               string   `envconfig:"KAFKA_VERSION"`
+	SecProtocol           string   `envconfig:"KAFKA_SEC_PROTO"`
+	SecCACerts            string   `envconfig:"KAFKA_SEC_CA_CERTS"`
+	SecClientKey          string   `envconfig:"KAFKA_SEC_CLIENT_KEY"                  json:"-"`
+	SecClientCert         string   `envconfig:"KAFKA_SEC_CLIENT_CERT"`
+	SecSkipVerify         bool     `envconfig:"KAFKA_SEC_SKIP_VERIFY"`
+	ReindexRequestedTopic string   `envconfig:"KAFKA_REINDEX_REQUESTED_TOPIC"`
 }
 
 // Get returns the default config with any modifications through environment
@@ -77,13 +78,14 @@ func Get() (*Config, error) {
 		SearchAPIURL:     "http://localhost:23900",
 		ServiceAuthToken: "",
 		KafkaConfig: KafkaConfig{
-			Brokers:                  []string{"localhost:9092"},
-			Version:                  "1.0.2",
-			SecProtocol:              "",
-			SecCACerts:               "",
-			SecClientCert:            "",
-			SecClientKey:             "",
-			SecSkipVerify:            false,
+			Brokers:               []string{"localhost:9092"},
+			Version:               "1.0.2",
+			SecProtocol:           "",
+			SecCACerts:            "",
+			SecClientCert:         "",
+			SecClientKey:          "",
+			SecSkipVerify:         false,
+			ReindexRequestedTopic: "reindex-requested",
 		},
 	}
 

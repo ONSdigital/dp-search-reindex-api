@@ -6,12 +6,20 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/ONSdigital/dp-api-clients-go/v2/headers"
+	kafka "github.com/ONSdigital/dp-kafka/v2"
 	dphttp "github.com/ONSdigital/dp-net/http"
+	"github.com/ONSdigital/dp-net/request"
+	"github.com/ONSdigital/dp-search-reindex-api/config"
+	"github.com/ONSdigital/dp-search-reindex-api/models"
+	"github.com/ONSdigital/dp-search-reindex-api/schema"
 	"github.com/ONSdigital/log.go/v2/log"
 	"github.com/pkg/errors"
 )
+
+const serviceName = "dp-search-reindex-api"
 
 // Reindex is a type that contains an implementation of the Indexer interface, which can be used for calling the Search API.
 type Reindex struct {
@@ -58,4 +66,43 @@ func (r *Reindex) GetIndexNameFromResponse(ctx context.Context, body io.ReadClos
 	}
 
 	return newIndexName.IndexName, nil
+}
+
+func (r *Reindex) SendReindexRequestedEvent(cfg *config.Config, jobID string, indexName string) error {
+	log.Namespace = serviceName
+	ctx := context.Background()
+
+	// Create Kafka Producer
+	pChannels := kafka.CreateProducerChannels()
+	kafkaProducer, err := kafka.NewProducer(ctx, cfg.KafkaConfig.Brokers, cfg.KafkaConfig.ReindexRequestedTopic, pChannels, &kafka.ProducerConfig{
+		KafkaVersion: &cfg.KafkaConfig.Version,
+	})
+	if err != nil {
+		return errors.New("failed to create kafka producer")
+	}
+
+	// kafka error logging go-routines
+	kafkaProducer.Channels().LogErrors(ctx, "kafka producer")
+
+	time.Sleep(500 * time.Millisecond)
+
+	traceID := request.NewRequestID(16)
+	reindexReqEvent := models.ReindexRequested{
+		JobID:       jobID,
+		SearchIndex: indexName,
+		TraceID:     traceID,
+	}
+
+	log.Info(ctx, "sending reindex-requested event", log.Data{"reindexRequestedEvent": reindexReqEvent})
+
+	bytes, err := schema.ReindexRequestedEvent.Marshal(reindexReqEvent)
+	if err != nil {
+		return errors.New("reindex-requested event error")
+	}
+
+	// Send bytes to Output channel, after calling Initialise just in case it is not initialised.
+	kafkaProducer.Initialise(ctx)
+	kafkaProducer.Channels().Output <- bytes
+
+	return err
 }
