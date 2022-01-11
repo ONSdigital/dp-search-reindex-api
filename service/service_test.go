@@ -11,6 +11,8 @@ import (
 	clientsidentity "github.com/ONSdigital/dp-api-clients-go/identity"
 	clientssitesearch "github.com/ONSdigital/dp-api-clients-go/site-search"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
+	dpkafka "github.com/ONSdigital/dp-kafka/v2"
+	"github.com/ONSdigital/dp-kafka/v2/kafkatest"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/api/mock"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
@@ -81,6 +83,11 @@ func TestRun(t *testing.T) {
 
 		authHandlerMock := &mock.AuthHandlerMock{}
 
+		producerMock := &kafkatest.IProducerMock{
+			ChannelsFunc: func() *dpkafka.ProducerChannels { return &dpkafka.ProducerChannels{} },
+			CheckerFunc:  func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+		}
+
 		funcDoGetMongoDBOk := func(ctx context.Context, cfg *config.Config) (service.MongoDataStorer, error) {
 			return mongoDBMock, nil
 		}
@@ -108,6 +115,10 @@ func TestRun(t *testing.T) {
 			return authHandlerMock
 		}
 
+		funcDoGetKafkaProducerOk := func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+			return producerMock, nil
+		}
+
 		testIdentityClient := clientsidentity.New(cfg.ZebedeeURL)
 		testSearchClient := clientssitesearch.NewClient(cfg.SearchAPIURL)
 
@@ -117,6 +128,7 @@ func TestRun(t *testing.T) {
 				DoGetMongoDBFunc:               funcDoGetMongoDBErr,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
+				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -136,6 +148,7 @@ func TestRun(t *testing.T) {
 				DoGetHealthCheckFunc:           funcDoGetHealthcheckErr,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
+				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -163,6 +176,9 @@ func TestRun(t *testing.T) {
 				},
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
+				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+					return producerMock, nil
+				},
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -187,6 +203,7 @@ func TestRun(t *testing.T) {
 				DoGetHealthCheckFunc:           funcDoGetHealthcheckOk,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
+				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -201,10 +218,11 @@ func TestRun(t *testing.T) {
 			})
 
 			Convey("The mongo DB checker is registered and health check and http servers are started", func() {
-				So(hcMock.AddCheckCalls(), ShouldHaveLength, 3)
+				So(hcMock.AddCheckCalls(), ShouldHaveLength, 4)
 				So(hcMock.AddCheckCalls()[0].Name, ShouldResemble, "Mongo DB")
 				So(hcMock.AddCheckCalls()[1].Name, ShouldResemble, "Zebedee")
 				So(hcMock.AddCheckCalls()[2].Name, ShouldResemble, "Search API")
+				So(hcMock.AddCheckCalls()[3].Name, ShouldResemble, "Kafka producer")
 				So(initMock.DoGetHTTPServerCalls(), ShouldHaveLength, 1)
 				So(initMock.DoGetHTTPServerCalls()[0].BindAddr, ShouldEqual, "localhost:25700")
 				So(hcMock.StartCalls(), ShouldHaveLength, 1)
@@ -220,6 +238,7 @@ func TestRun(t *testing.T) {
 				DoGetHealthCheckFunc:           funcDoGetHealthcheckOk,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
+				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -273,6 +292,11 @@ func TestClose(t *testing.T) {
 			},
 		}
 
+		producerMock := &kafkatest.IProducerMock{
+			ChannelsFunc: func() *dpkafka.ProducerChannels { return &dpkafka.ProducerChannels{} },
+			CheckerFunc:  func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+		}
+
 		testIdentityClient := clientsidentity.New(cfg.ZebedeeURL)
 		testSearchClient := clientssitesearch.NewClient(cfg.SearchAPIURL)
 
@@ -290,6 +314,9 @@ func TestClose(t *testing.T) {
 				DoGetHealthClientFunc: func(name, url string) *health.Client { return &health.Client{} },
 				DoGetAuthorisationHandlersFunc: func(ctx context.Context, cfg *config.Config) api.AuthHandler {
 					return authHandlerMock
+				},
+				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+					return producerMock, nil
 				},
 			}
 
@@ -324,6 +351,9 @@ func TestClose(t *testing.T) {
 				DoGetHealthClientFunc: func(name, url string) *health.Client { return &health.Client{} },
 				DoGetAuthorisationHandlersFunc: func(ctx context.Context, cfg *config.Config) api.AuthHandler {
 					return authHandlerMock
+				},
+				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+					return producerMock, nil
 				},
 			}
 

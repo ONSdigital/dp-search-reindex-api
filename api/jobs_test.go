@@ -75,13 +75,19 @@ func TestCreateJobHandler(t *testing.T) {
 		},
 	}
 
+	producerMock := &apiMock.ReindexRequestedProducerMock{
+		ProduceReindexRequestedFunc: func(ctx context.Context, event models.ReindexRequested) error {
+			return nil
+		},
+	}
+
 	Convey("Given a Search Reindex Job API that can create valid search reindex jobs and store their details in a Data Store", t, func() {
 		api.NewID = func() string { return validJobID1 }
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
 
-		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock)
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock, producerMock)
 
 		Convey("When a new reindex job is created and stored", func() {
 			req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
@@ -120,7 +126,7 @@ func TestCreateJobHandler(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
-		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock)
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock, producerMock)
 
 		Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
 			req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
@@ -141,7 +147,7 @@ func TestCreateJobHandler(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
-		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock)
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock, producerMock)
 
 		Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
 			req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
@@ -186,7 +192,7 @@ func TestGetJobHandler(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
-		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{})
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
 
 		Convey("When a request is made to get a specific job that exists in the Data Store", func() {
 			req := httptest.NewRequest("GET", fmt.Sprintf("http://localhost:25700/jobs/%s", validJobID2), nil)
@@ -293,7 +299,7 @@ func TestGetJobsHandler(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
-		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{})
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
 
 		Convey("When a request is made to get a list of all the jobs that exist in the Data Store", func() {
 			req := httptest.NewRequest("GET", "http://localhost:25700/jobs", nil)
@@ -477,7 +483,7 @@ func TestGetJobsHandlerWithEmptyJobStore(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
-		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{})
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
 
 		Convey("When a request is made to get a list of all the jobs that exist in the jobs collection", func() {
 			req := httptest.NewRequest("GET", "http://localhost:25700/jobs", nil)
@@ -516,7 +522,7 @@ func TestGetJobsHandlerWithInternalServerError(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
-		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{})
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
 
 		Convey("When a request is made to get a list of all the jobs that exist in the jobs collection", func() {
 			req := httptest.NewRequest("GET", "http://localhost:25700/jobs", nil)
@@ -596,7 +602,7 @@ func TestPutNumTasksHandler(t *testing.T) {
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
-		apiInstance := api.Setup(mux.NewRouter(), jobStoreMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{})
+		apiInstance := api.Setup(mux.NewRouter(), jobStoreMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
 
 		Convey("When a request is made to update the number of tasks of a specific job that exists in the Data Store", func() {
 			req := httptest.NewRequest("PUT", fmt.Sprintf("http://localhost:25700/jobs/%s/number_of_tasks/%s", validJobID2, validCount), nil)

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	dpkafka "github.com/ONSdigital/dp-kafka/v2"
 	"net/http"
 
 	"github.com/ONSdigital/dp-api-clients-go/health"
@@ -22,6 +23,7 @@ type Initialiser interface {
 	DoGetHealthClient(name, url string) *health.Client
 	DoGetMongoDB(ctx context.Context, cfg *config.Config) (MongoDataStorer, error)
 	DoGetAuthorisationHandlers(ctx context.Context, cfg *config.Config) api.AuthHandler
+	DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error)
 }
 
 // HTTPServer defines the required methods from the HTTP server

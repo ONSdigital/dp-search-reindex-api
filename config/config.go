@@ -78,7 +78,7 @@ func Get() (*Config, error) {
 		SearchAPIURL:     "http://localhost:23900",
 		ServiceAuthToken: "",
 		KafkaConfig: KafkaConfig{
-			Brokers:               []string{"localhost:9092"},
+			Brokers:               []string{"localhost:9092", "localhost:9093", "localhost:9094"},
 			Version:               "1.0.2",
 			SecProtocol:           "",
 			SecCACerts:            "",

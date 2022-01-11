@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	kafka "github.com/ONSdigital/dp-kafka/v2"
+	"github.com/ONSdigital/dp-search-reindex-api/event"
 
 	clientsidentity "github.com/ONSdigital/dp-api-clients-go/identity"
 	clientssitesearch "github.com/ONSdigital/dp-api-clients-go/site-search"
@@ -10,6 +12,7 @@ import (
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
 	"github.com/ONSdigital/dp-search-reindex-api/reindex"
+	"github.com/ONSdigital/dp-search-reindex-api/schema"
 	"github.com/ONSdigital/log.go/v2/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -25,6 +28,7 @@ type Service struct {
 	serviceList *ExternalServiceList
 	healthCheck HealthChecker
 	mongoDB     MongoDataStorer
+	producer    kafka.IProducer
 }
 
 // Run the service
@@ -50,8 +54,23 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	httpClient := dpHTTP.NewClient()
 	indexer := &reindex.Reindex{}
 
+	// Get Kafka producer
+	producer, err := serviceList.GetKafkaProducer(ctx, cfg)
+	if err != nil {
+		log.Fatal(ctx, "failed to initialise kafka producer", err)
+		return nil, err
+	}
+
+	reindexRequestedProducer := event.ReindexRequestedProducer{
+		Marshaller: schema.ReindexRequestedEvent,
+		Producer:   producer,
+	}
+
+	// Kafka error logging go-routine
+	producer.Channels().LogErrors(ctx, "kafka producer channels error")
+
 	// Setup the API
-	api.Setup(r, mongoDB, permissions, taskNames, cfg, httpClient, indexer)
+	api.Setup(r, mongoDB, permissions, taskNames, cfg, httpClient, indexer, reindexRequestedProducer)
 
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)
@@ -69,6 +88,10 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 	}
 	if err = hc.AddCheck("Search API", searchClient.Checker); err != nil {
 		log.Error(ctx, "error adding check for search api", err)
+		return nil, err
+	}
+	if err = hc.AddCheck("Kafka producer", producer.Checker); err != nil {
+		log.Error(ctx, "error adding check for Kafka producer", err)
 		return nil, err
 	}
 

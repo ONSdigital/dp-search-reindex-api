@@ -13,6 +13,7 @@ import (
 
 //go:generate moq -out mock/data_storer.go -pkg mock . DataStorer
 //go:generate moq -out mock/indexer.go -pkg mock . Indexer
+//go:generate moq -out mock/reindex_requested_producer.go -pkg mock . ReindexRequestedProducer
 
 // DataStorer is an interface for a type that can store and retrieve jobs
 type DataStorer interface {
@@ -43,4 +44,8 @@ type Indexer interface {
 	CreateIndex(ctx context.Context, serviceAuthToken, searchAPISearchURL string, httpClient dpHTTP.Clienter) (*http.Response, error)
 	GetIndexNameFromResponse(ctx context.Context, body io.ReadCloser) (string, error)
 	SendReindexRequestedEvent(cfg *config.Config, jobID string, indexName string) error
+}
+
+type ReindexRequestedProducer interface {
+	ProduceReindexRequested(ctx context.Context, event models.ReindexRequested) error
 }
