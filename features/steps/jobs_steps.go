@@ -107,6 +107,12 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
 	kafkaProducer.CheckerFunc = funcCheck
 	f.KafkaProducer = kafkaProducer
 
+	go func() {
+		for {
+			<-kafkaProducer.Channels().Output
+		}
+	}()
+
 	err = runJobsFeatureService(ctx, f, err, cfg, svcErrors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run JobsFeature service: %w", err)
