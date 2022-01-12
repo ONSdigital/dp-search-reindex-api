@@ -108,8 +108,8 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
 	f.KafkaProducer = kafkaProducer
 
 	go func() {
-		for {
-			<-kafkaProducer.Channels().Output
+		for msgInBytes := range kafkaProducer.Channels().Output {
+			fmt.Printf("message received: %v", msgInBytes)
 		}
 	}()
 
@@ -274,16 +274,6 @@ func (f *JobsFeature) DoGetAuthorisationHandlers(ctx context.Context, cfg *confi
 
 // DoGetKafkaProducer returns a mock kafka producer.
 func (f *JobsFeature) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
-	//pChannels := dpkafka.CreateProducerChannels()
-	//pConfig := &dpkafka.ProducerConfig{
-	//	KafkaVersion: &cfg.KafkaConfig.Version,
-	//}
-	//
-	//producer, err := dpkafka.NewProducer(ctx, cfg.KafkaConfig.Brokers, cfg.KafkaConfig.ReindexRequestedTopic, pChannels, pConfig)
-	//if err != nil {
-	//	return nil, fmt.Errorf("kafka producer returned an error: %w", err)
-	//}
-
 	return f.KafkaProducer, nil
 }
 
@@ -322,6 +312,10 @@ func (f *JobsFeature) iWouldExpectJobIDLastupdatedAndLinksToHaveThisStructure(ta
 // It takes a table that contains the expected structures for job_id, last_updated, links, and search_index_name values.
 // And it asserts whether or not these are found.
 func (f *JobsFeature) theResponseShouldContainValuesThatHaveTheseStructures(table *godog.Table) error {
+	//for ch := range f.KafkaProducer.Channels().Output {
+	//
+	//}
+
 	f.responseBody, _ = io.ReadAll(f.APIFeature.HttpResponse.Body)
 
 	assist := assistdog.NewDefault()

@@ -140,6 +140,14 @@ func (svc *Service) Close(ctx context.Context) error {
 			hasShutdownError = true
 		}
 
+		// close kafka producer
+		//if svc.serviceList.KafkaProducer {
+		//	if err := svc.producer.Close(ctx); err != nil {
+		//		log.Error(ctx, "error closing kafka producer", err)
+		//		hasShutdownError = true
+		//	}
+		//}
+
 		// close API
 		if err := svc.api.Close(ctx); err != nil {
 			log.Error(ctx, "error closing API", err)
