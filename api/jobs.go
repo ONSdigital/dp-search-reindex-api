@@ -105,6 +105,7 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 				http.Error(w, serverErrorMessage, http.StatusInternalServerError)
 				return
 			}
+			log.Info(ctx, "reindex request has been processed")
 		}
 	}
 

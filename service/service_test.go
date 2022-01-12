@@ -128,7 +128,7 @@ func TestRun(t *testing.T) {
 				DoGetMongoDBFunc:               funcDoGetMongoDBErr,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
-				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
+				DoGetKafkaProducerFunc:         funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -148,7 +148,7 @@ func TestRun(t *testing.T) {
 				DoGetHealthCheckFunc:           funcDoGetHealthcheckErr,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
-				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
+				DoGetKafkaProducerFunc:         funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -203,7 +203,7 @@ func TestRun(t *testing.T) {
 				DoGetHealthCheckFunc:           funcDoGetHealthcheckOk,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
-				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
+				DoGetKafkaProducerFunc:         funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)
@@ -238,7 +238,7 @@ func TestRun(t *testing.T) {
 				DoGetHealthCheckFunc:           funcDoGetHealthcheckOk,
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
-				DoGetKafkaProducerFunc:			funcDoGetKafkaProducerOk,
+				DoGetKafkaProducerFunc:         funcDoGetKafkaProducerOk,
 			}
 			svcErrors := make(chan error, 1)
 			svcList := service.NewServiceList(initMock)

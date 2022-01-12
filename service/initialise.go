@@ -108,15 +108,6 @@ func (e *Init) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (dpka
 		return nil, err
 	}
 
-	// Create Kafka Producer
-	//pChannels := kafka.CreateProducerChannels()
-	//kafkaProducer, err := kafka.NewProducer(ctx, cfg.KafkaConfig.Brokers, cfg.KafkaConfig.ReindexRequestedTopic, pChannels, &kafka.ProducerConfig{
-	//	KafkaVersion: &cfg.KafkaConfig.Version,
-	//})
-	//if err != nil {
-	//	return errors.New("failed to create kafka producer")
-	//}
-
 	return producer, nil
 }
 

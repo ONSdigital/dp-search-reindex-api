@@ -18,6 +18,8 @@ import (
 	componentTest "github.com/ONSdigital/dp-component-test"
 	"github.com/ONSdigital/dp-component-test/utils"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
+	dpkafka "github.com/ONSdigital/dp-kafka/v2"
+	"github.com/ONSdigital/dp-kafka/v2/kafkatest"
 	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
@@ -65,10 +67,13 @@ type JobsFeature struct {
 	MongoFeature   *componentTest.MongoFeature
 	AuthFeature    *componentTest.AuthorizationFeature
 	SearchFeature  *SearchFeature
+	KafkaProducer  dpkafka.IProducer
 }
 
 // NewJobsFeature returns a pointer to a new JobsFeature, which can then be used for testing the /jobs endpoint.
-func NewJobsFeature(mongoFeature *componentTest.MongoFeature, authFeature *componentTest.AuthorizationFeature, searchFeature *SearchFeature) (*JobsFeature, error) {
+func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
+					authFeature *componentTest.AuthorizationFeature,
+					searchFeature *SearchFeature) (*JobsFeature, error) {
 	f := &JobsFeature{
 		HTTPServer:     &http.Server{},
 		errorChan:      make(chan error),
@@ -98,6 +103,10 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature, authFeature *compo
 	f.SearchFeature = searchFeature
 	cfg.SearchAPIURL = f.SearchFeature.FakeSearchAPI.ResolveURL("")
 
+	kafkaProducer := kafkatest.NewMessageProducer(true)
+	kafkaProducer.CheckerFunc = funcCheck
+	f.KafkaProducer = kafkaProducer
+
 	err = runJobsFeatureService(ctx, f, err, cfg, svcErrors)
 	if err != nil {
 		return nil, fmt.Errorf("failed to run JobsFeature service: %w", err)
@@ -115,6 +124,7 @@ func runJobsFeatureService(ctx context.Context, f *JobsFeature, jobErr error, cf
 		DoGetHTTPServerFunc:            f.DoGetHTTPServer,
 		DoGetMongoDBFunc:               f.DoGetMongoDB,
 		DoGetAuthorisationHandlersFunc: f.DoGetAuthorisationHandlers,
+		DoGetKafkaProducerFunc:			f.DoGetKafkaProducer,
 	}
 
 	serviceList := service.NewServiceList(initFunctions)
@@ -254,6 +264,21 @@ func (f *JobsFeature) DoGetAuthorisationHandlers(ctx context.Context, cfg *confi
 		authVerifier,
 	)
 	return permissions
+}
+
+// DoGetKafkaProducer returns a mock kafka producer.
+func (f *JobsFeature) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+	//pChannels := dpkafka.CreateProducerChannels()
+	//pConfig := &dpkafka.ProducerConfig{
+	//	KafkaVersion: &cfg.KafkaConfig.Version,
+	//}
+	//
+	//producer, err := dpkafka.NewProducer(ctx, cfg.KafkaConfig.Brokers, cfg.KafkaConfig.ReindexRequestedTopic, pChannels, pConfig)
+	//if err != nil {
+	//	return nil, fmt.Errorf("kafka producer returned an error: %w", err)
+	//}
+
+	return f.KafkaProducer, nil
 }
 
 // iWouldExpectJobIDLastupdatedAndLinksToHaveThisStructure is a feature step that can be defined for a specific JobsFeature.
@@ -1159,4 +1184,9 @@ func (f *JobsFeature) checkValuesInJob(expectedResult map[string]string, job mod
 func (f *JobsFeature) checkValuesInTask(expectedResult map[string]string, task models.Task) {
 	assert.Equal(&f.ErrorFeature, expectedResult["number_of_documents"], strconv.Itoa(task.NumberOfDocuments))
 	assert.Equal(&f.ErrorFeature, expectedResult["task_name"], task.TaskName)
+}
+
+// funcCheck is used to mock the kafka producer CheckerFunc
+func funcCheck(ctx context.Context, state *healthcheck.CheckState) error {
+	return nil
 }
