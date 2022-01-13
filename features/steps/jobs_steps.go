@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/ONSdigital/dp-search-reindex-api/event"
+	"github.com/ONSdigital/dp-search-reindex-api/event/mock"
 	"io"
 	"net/http"
 	"regexp"
@@ -18,7 +20,6 @@ import (
 	componentTest "github.com/ONSdigital/dp-component-test"
 	"github.com/ONSdigital/dp-component-test/utils"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
-	dpkafka "github.com/ONSdigital/dp-kafka/v2"
 	"github.com/ONSdigital/dp-kafka/v2/kafkatest"
 	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
@@ -67,7 +68,7 @@ type JobsFeature struct {
 	MongoFeature   *componentTest.MongoFeature
 	AuthFeature    *componentTest.AuthorizationFeature
 	SearchFeature  *SearchFeature
-	KafkaProducer  dpkafka.IProducer
+	KafkaProducer  service.KafkaProducer
 }
 
 // NewJobsFeature returns a pointer to a new JobsFeature, which can then be used for testing the /jobs endpoint.
@@ -105,7 +106,17 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
 
 	kafkaProducer := kafkatest.NewMessageProducer(true)
 	kafkaProducer.CheckerFunc = funcCheck
-	f.KafkaProducer = kafkaProducer
+
+	marshaller := &mock.MarshallerMock{
+		MarshalFunc: func(s interface{}) ([]byte, error) { return nil, nil },
+	}
+
+	producer := &event.ReindexRequestedProducer{
+		Marshaller: marshaller,
+		Producer: kafkaProducer,
+	}
+
+	f.KafkaProducer = producer
 
 	go func() {
 		for msgInBytes := range kafkaProducer.Channels().Output {
@@ -273,7 +284,7 @@ func (f *JobsFeature) DoGetAuthorisationHandlers(ctx context.Context, cfg *confi
 }
 
 // DoGetKafkaProducer returns a mock kafka producer.
-func (f *JobsFeature) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+func (f *JobsFeature) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error) {
 	return f.KafkaProducer, nil
 }
 
@@ -312,8 +323,7 @@ func (f *JobsFeature) iWouldExpectJobIDLastupdatedAndLinksToHaveThisStructure(ta
 // It takes a table that contains the expected structures for job_id, last_updated, links, and search_index_name values.
 // And it asserts whether or not these are found.
 func (f *JobsFeature) theResponseShouldContainValuesThatHaveTheseStructures(table *godog.Table) error {
-	//for ch := range f.KafkaProducer.Channels().Output {
-	//
+	//for msgInBytes := range f.KafkaProducer.Channels().Output {
 	//}
 
 	f.responseBody, _ = io.ReadAll(f.APIFeature.HttpResponse.Body)

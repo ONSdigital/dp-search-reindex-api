@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"github.com/ONSdigital/dp-search-reindex-api/event"
+	"github.com/ONSdigital/dp-search-reindex-api/schema"
 	"net/http"
 
 	"github.com/ONSdigital/dp-api-clients-go/health"
@@ -79,7 +81,7 @@ func (e *ExternalServiceList) GetHealthCheck(cfg *config.Config, buildTime, gitC
 }
 
 // GetKafkaProducer creates a Kafka producer and sets the producder flag to true
-func (e *ExternalServiceList) GetKafkaProducer(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+func (e *ExternalServiceList) GetKafkaProducer(ctx context.Context, cfg *config.Config) (KafkaProducer, error) {
 	producer, err := e.Init.DoGetKafkaProducer(ctx, cfg)
 	if err != nil {
 		return nil, err
@@ -88,7 +90,7 @@ func (e *ExternalServiceList) GetKafkaProducer(ctx context.Context, cfg *config.
 	return producer, nil
 }
 
-func (e *Init) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+func (e *Init) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (KafkaProducer, error) {
 	pChannels := dpkafka.CreateProducerChannels()
 	pConfig := &dpkafka.ProducerConfig{
 		KafkaVersion: &cfg.KafkaConfig.Version,
@@ -108,7 +110,15 @@ func (e *Init) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (dpka
 		return nil, err
 	}
 
-	return producer, nil
+	reindexRequestedProducer := &event.ReindexRequestedProducer{
+		Marshaller: schema.ReindexRequestedEvent,
+		Producer:   producer,
+	}
+
+	// Kafka error logging go-routine
+	producer.Channels().LogErrors(ctx, "kafka producer channels error")
+
+	return reindexRequestedProducer, nil
 }
 
 // DoGetHTTPServer creates an HTTP Server with the provided bind address and router

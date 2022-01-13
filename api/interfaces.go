@@ -7,7 +7,6 @@ import (
 
 	"github.com/ONSdigital/dp-authorisation/auth"
 	dpHTTP "github.com/ONSdigital/dp-net/http"
-	"github.com/ONSdigital/dp-search-reindex-api/config"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
 )
 
@@ -40,12 +39,13 @@ type AuthHandler interface {
 	Require(required auth.Permissions, handler http.HandlerFunc) http.HandlerFunc
 }
 
+// Indexer is a type that can create new ElasticSearch indexes
 type Indexer interface {
 	CreateIndex(ctx context.Context, serviceAuthToken, searchAPISearchURL string, httpClient dpHTTP.Clienter) (*http.Response, error)
 	GetIndexNameFromResponse(ctx context.Context, body io.ReadCloser) (string, error)
-	SendReindexRequestedEvent(cfg *config.Config, jobID string, indexName string) error
 }
 
+// ReindexRequestedProducer is a type that can produce reindex-requested events
 type ReindexRequestedProducer interface {
 	ProduceReindexRequested(ctx context.Context, event models.ReindexRequested) error
 }

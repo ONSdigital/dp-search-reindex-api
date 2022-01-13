@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	kafka "github.com/ONSdigital/dp-kafka/v2"
-	"github.com/ONSdigital/dp-search-reindex-api/event"
 
 	clientsidentity "github.com/ONSdigital/dp-api-clients-go/identity"
 	clientssitesearch "github.com/ONSdigital/dp-api-clients-go/site-search"
@@ -12,7 +10,6 @@ import (
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
 	"github.com/ONSdigital/dp-search-reindex-api/reindex"
-	"github.com/ONSdigital/dp-search-reindex-api/schema"
 	"github.com/ONSdigital/log.go/v2/log"
 	"github.com/gorilla/mux"
 	"github.com/justinas/alice"
@@ -28,7 +25,7 @@ type Service struct {
 	serviceList *ExternalServiceList
 	healthCheck HealthChecker
 	mongoDB     MongoDataStorer
-	producer    kafka.IProducer
+	producer    KafkaProducer
 }
 
 // Run the service
@@ -61,16 +58,8 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 		return nil, err
 	}
 
-	reindexRequestedProducer := event.ReindexRequestedProducer{
-		Marshaller: schema.ReindexRequestedEvent,
-		Producer:   producer,
-	}
-
-	// Kafka error logging go-routine
-	producer.Channels().LogErrors(ctx, "kafka producer channels error")
-
 	// Setup the API
-	api.Setup(r, mongoDB, permissions, taskNames, cfg, httpClient, indexer, reindexRequestedProducer)
+	api.Setup(r, mongoDB, permissions, taskNames, cfg, httpClient, indexer, producer)
 
 	// Get HealthCheck
 	hc, err := serviceList.GetHealthCheck(cfg, buildTime, gitCommit, version)
@@ -113,6 +102,7 @@ func Run(ctx context.Context, cfg *config.Config, serviceList *ExternalServiceLi
 		serviceList: serviceList,
 		healthCheck: hc,
 		mongoDB:     mongoDB,
+		producer:    producer,
 	}, nil
 }
 
@@ -141,12 +131,12 @@ func (svc *Service) Close(ctx context.Context) error {
 		}
 
 		// close kafka producer
-		//if svc.serviceList.KafkaProducer {
-		//	if err := svc.producer.Close(ctx); err != nil {
-		//		log.Error(ctx, "error closing kafka producer", err)
-		//		hasShutdownError = true
-		//	}
-		//}
+		if svc.serviceList.KafkaProducer {
+			if err := svc.producer.Close(ctx); err != nil {
+				log.Error(ctx, "error closing kafka producer", err)
+				hasShutdownError = true
+			}
+		}
 
 		// close API
 		if err := svc.api.Close(ctx); err != nil {

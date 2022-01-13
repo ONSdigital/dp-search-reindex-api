@@ -6,7 +6,6 @@ package mock
 import (
 	"context"
 	"github.com/ONSdigital/dp-api-clients-go/health"
-	kafka "github.com/ONSdigital/dp-kafka/v2"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
 	"github.com/ONSdigital/dp-search-reindex-api/service"
@@ -36,7 +35,7 @@ var _ service.Initialiser = &InitialiserMock{}
 // 			DoGetHealthClientFunc: func(name string, url string) *health.Client {
 // 				panic("mock out the DoGetHealthClient method")
 // 			},
-// 			DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (kafka.IProducer, error) {
+// 			DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error) {
 // 				panic("mock out the DoGetKafkaProducer method")
 // 			},
 // 			DoGetMongoDBFunc: func(ctx context.Context, cfg *config.Config) (service.MongoDataStorer, error) {
@@ -62,7 +61,7 @@ type InitialiserMock struct {
 	DoGetHealthClientFunc func(name string, url string) *health.Client
 
 	// DoGetKafkaProducerFunc mocks the DoGetKafkaProducer method.
-	DoGetKafkaProducerFunc func(ctx context.Context, cfg *config.Config) (kafka.IProducer, error)
+	DoGetKafkaProducerFunc func(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error)
 
 	// DoGetMongoDBFunc mocks the DoGetMongoDB method.
 	DoGetMongoDBFunc func(ctx context.Context, cfg *config.Config) (service.MongoDataStorer, error)
@@ -273,7 +272,7 @@ func (mock *InitialiserMock) DoGetHealthClientCalls() []struct {
 }
 
 // DoGetKafkaProducer calls DoGetKafkaProducerFunc.
-func (mock *InitialiserMock) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (kafka.IProducer, error) {
+func (mock *InitialiserMock) DoGetKafkaProducer(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error) {
 	if mock.DoGetKafkaProducerFunc == nil {
 		panic("InitialiserMock.DoGetKafkaProducerFunc: method is nil but Initialiser.DoGetKafkaProducer was just called")
 	}

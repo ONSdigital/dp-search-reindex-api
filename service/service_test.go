@@ -11,8 +11,6 @@ import (
 	clientsidentity "github.com/ONSdigital/dp-api-clients-go/identity"
 	clientssitesearch "github.com/ONSdigital/dp-api-clients-go/site-search"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
-	dpkafka "github.com/ONSdigital/dp-kafka/v2"
-	"github.com/ONSdigital/dp-kafka/v2/kafkatest"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/api/mock"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
@@ -83,9 +81,8 @@ func TestRun(t *testing.T) {
 
 		authHandlerMock := &mock.AuthHandlerMock{}
 
-		producerMock := &kafkatest.IProducerMock{
-			ChannelsFunc: func() *dpkafka.ProducerChannels { return &dpkafka.ProducerChannels{} },
-			CheckerFunc:  func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+		producerMock := &serviceMock.KafkaProducerMock{
+			CloseFunc: func(ctx context.Context) error { return nil },
 		}
 
 		funcDoGetMongoDBOk := func(ctx context.Context, cfg *config.Config) (service.MongoDataStorer, error) {
@@ -115,7 +112,7 @@ func TestRun(t *testing.T) {
 			return authHandlerMock
 		}
 
-		funcDoGetKafkaProducerOk := func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+		funcDoGetKafkaProducerOk := func(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error) {
 			return producerMock, nil
 		}
 
@@ -176,7 +173,7 @@ func TestRun(t *testing.T) {
 				},
 				DoGetHealthClientFunc:          funcDoGetHealthClientOk,
 				DoGetAuthorisationHandlersFunc: funcDoGetAuthorisationHandlersOk,
-				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error) {
 					return producerMock, nil
 				},
 			}
@@ -292,9 +289,8 @@ func TestClose(t *testing.T) {
 			},
 		}
 
-		producerMock := &kafkatest.IProducerMock{
-			ChannelsFunc: func() *dpkafka.ProducerChannels { return &dpkafka.ProducerChannels{} },
-			CheckerFunc:  func(ctx context.Context, state *healthcheck.CheckState) error { return nil },
+		producerMock := &serviceMock.KafkaProducerMock{
+			CloseFunc: func(ctx context.Context) error { return nil },
 		}
 
 		testIdentityClient := clientsidentity.New(cfg.ZebedeeURL)
@@ -315,7 +311,7 @@ func TestClose(t *testing.T) {
 				DoGetAuthorisationHandlersFunc: func(ctx context.Context, cfg *config.Config) api.AuthHandler {
 					return authHandlerMock
 				},
-				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error) {
 					return producerMock, nil
 				},
 			}
@@ -330,7 +326,7 @@ func TestClose(t *testing.T) {
 			So(hcMock.StopCalls(), ShouldHaveLength, 1)
 			So(serverMock.ShutdownCalls(), ShouldHaveLength, 1)
 			So(mongoDBMock.CloseCalls(), ShouldHaveLength, 1)
-			//So(producerMock.CloseCalls(), ShouldHaveLength, 1)
+			So(producerMock.CloseCalls(), ShouldHaveLength, 1)
 		})
 
 		Convey("If services fail to stop, the Close operation tries to close all dependencies and returns an error", func() {
@@ -353,7 +349,7 @@ func TestClose(t *testing.T) {
 				DoGetAuthorisationHandlersFunc: func(ctx context.Context, cfg *config.Config) api.AuthHandler {
 					return authHandlerMock
 				},
-				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (dpkafka.IProducer, error) {
+				DoGetKafkaProducerFunc: func(ctx context.Context, cfg *config.Config) (service.KafkaProducer, error) {
 					return producerMock, nil
 				},
 			}
