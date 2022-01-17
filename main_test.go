@@ -4,6 +4,8 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	golog "log"
 
 	"os"
 	"testing"
@@ -75,6 +77,10 @@ func (f *ComponentTest) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 	})
 }
 func TestComponent(t *testing.T) {
+
+	log.SetDestination(io.Discard, io.Discard)
+	golog.SetOutput(io.Discard)
+
 	if *componentFlag {
 		status := 0
 		var opts = godog.Options{
