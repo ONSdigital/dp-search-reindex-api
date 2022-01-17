@@ -5,8 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ONSdigital/dp-search-reindex-api/event"
-	"github.com/ONSdigital/dp-search-reindex-api/event/mock"
 	"io"
 	"net/http"
 	"regexp"
@@ -20,12 +18,15 @@ import (
 	componentTest "github.com/ONSdigital/dp-component-test"
 	"github.com/ONSdigital/dp-component-test/utils"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
+	kafka "github.com/ONSdigital/dp-kafka/v2"
 	"github.com/ONSdigital/dp-kafka/v2/kafkatest"
 	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
+	"github.com/ONSdigital/dp-search-reindex-api/event"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
 	"github.com/ONSdigital/dp-search-reindex-api/mongo"
+	"github.com/ONSdigital/dp-search-reindex-api/schema"
 	"github.com/ONSdigital/dp-search-reindex-api/service"
 	serviceMock "github.com/ONSdigital/dp-search-reindex-api/service/mock"
 	"github.com/cucumber/godog"
@@ -56,25 +57,26 @@ var (
 
 // JobsFeature is a type that contains all the requirements for running a godog (cucumber) feature that tests the /jobs endpoint.
 type JobsFeature struct {
-	ErrorFeature   componentTest.ErrorFeature
-	svc            *service.Service
-	errorChan      chan error
-	Config         *config.Config
-	HTTPServer     *http.Server
-	ServiceRunning bool
-	APIFeature     *componentTest.APIFeature
-	responseBody   []byte
-	MongoClient    *mongo.JobStore
-	MongoFeature   *componentTest.MongoFeature
-	AuthFeature    *componentTest.AuthorizationFeature
-	SearchFeature  *SearchFeature
-	KafkaProducer  service.KafkaProducer
+	ErrorFeature    componentTest.ErrorFeature
+	svc             *service.Service
+	errorChan       chan error
+	Config          *config.Config
+	HTTPServer      *http.Server
+	ServiceRunning  bool
+	APIFeature      *componentTest.APIFeature
+	responseBody    []byte
+	MongoClient     *mongo.JobStore
+	MongoFeature    *componentTest.MongoFeature
+	AuthFeature     *componentTest.AuthorizationFeature
+	SearchFeature   *SearchFeature
+	KafkaProducer   service.KafkaProducer
+	MessageProducer kafka.IProducer
 }
 
 // NewJobsFeature returns a pointer to a new JobsFeature, which can then be used for testing the /jobs endpoint.
 func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
-					authFeature *componentTest.AuthorizationFeature,
-					searchFeature *SearchFeature) (*JobsFeature, error) {
+	authFeature *componentTest.AuthorizationFeature,
+	searchFeature *SearchFeature) (*JobsFeature, error) {
 	f := &JobsFeature{
 		HTTPServer:     &http.Server{},
 		errorChan:      make(chan error),
@@ -104,25 +106,15 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
 	f.SearchFeature = searchFeature
 	cfg.SearchAPIURL = f.SearchFeature.FakeSearchAPI.ResolveURL("")
 
-	kafkaProducer := kafkatest.NewMessageProducer(true)
-	kafkaProducer.CheckerFunc = funcCheck
+	messageProducer := kafkatest.NewMessageProducer(true)
+	messageProducer.CheckerFunc = funcCheck
+	f.MessageProducer = messageProducer
 
-	marshaller := &mock.MarshallerMock{
-		MarshalFunc: func(s interface{}) ([]byte, error) { return nil, nil },
+	kafkaProducer := &event.ReindexRequestedProducer{
+		Marshaller: schema.ReindexRequestedEvent,
+		Producer:   messageProducer,
 	}
-
-	producer := &event.ReindexRequestedProducer{
-		Marshaller: marshaller,
-		Producer: kafkaProducer,
-	}
-
-	f.KafkaProducer = producer
-
-	go func() {
-		for msgInBytes := range kafkaProducer.Channels().Output {
-			fmt.Printf("message received: %v", msgInBytes)
-		}
-	}()
+	f.KafkaProducer = kafkaProducer
 
 	err = runJobsFeatureService(ctx, f, err, cfg, svcErrors)
 	if err != nil {
@@ -141,7 +133,7 @@ func runJobsFeatureService(ctx context.Context, f *JobsFeature, jobErr error, cf
 		DoGetHTTPServerFunc:            f.DoGetHTTPServer,
 		DoGetMongoDBFunc:               f.DoGetMongoDB,
 		DoGetAuthorisationHandlersFunc: f.DoGetAuthorisationHandlers,
-		DoGetKafkaProducerFunc:			f.DoGetKafkaProducer,
+		DoGetKafkaProducerFunc:         f.DoGetKafkaProducer,
 	}
 
 	serviceList := service.NewServiceList(initFunctions)
@@ -203,6 +195,7 @@ func (f *JobsFeature) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^in each job I would expect the response to contain values that have these structures$`, f.inEachJobIWouldExpectTheResponseToContainValuesThatHaveTheseStructures)
 	ctx.Step(`^the search reindex api loses its connection to the search api$`, f.theSearchReindexAPILosesItsConnectionToTheSearchAPI)
 	ctx.Step(`^the response should contain a state of "([^"]*)"$`, f.theResponseShouldContainAStateOf)
+	ctx.Step(`^I POST \/jobs and inspect the reindex-requested event produced$`, f.iPOSTJobsAndInspectTheReindexrequestedEventProduced)
 }
 
 // iAmNotIdentifiedByZebedee is a feature step that can be defined for a specific JobsFeature.
@@ -323,9 +316,6 @@ func (f *JobsFeature) iWouldExpectJobIDLastupdatedAndLinksToHaveThisStructure(ta
 // It takes a table that contains the expected structures for job_id, last_updated, links, and search_index_name values.
 // And it asserts whether or not these are found.
 func (f *JobsFeature) theResponseShouldContainValuesThatHaveTheseStructures(table *godog.Table) error {
-	//for msgInBytes := range f.KafkaProducer.Channels().Output {
-	//}
-
 	f.responseBody, _ = io.ReadAll(f.APIFeature.HttpResponse.Body)
 
 	assist := assistdog.NewDefault()
@@ -452,6 +442,12 @@ func (f *JobsFeature) theResponseShouldContainAStateOf(expectedState string) err
 // It calls POST /jobs with an empty body, which causes a default job resource to be generated.
 // The newly created job resource is stored in the Job Store and also returned in the response body.
 func (f *JobsFeature) iHaveGeneratedAJobInTheJobStore() error {
+	go func() {
+		for msgInBytes := range f.MessageProducer.Channels().Output {
+			fmt.Printf("message received: %v", msgInBytes)
+		}
+	}()
+
 	// call POST /jobs
 	err := f.callPostJobs()
 	if err != nil {
@@ -560,6 +556,12 @@ func (f *JobsFeature) iCallPOSTJobsidtasksToUpdateTheNumberofdocumentsForThatTas
 // iHaveGeneratedThreeJobsInTheJobStore is a feature step that can be defined for a specific JobsFeature.
 // It calls POST /jobs with an empty body, three times, which causes three default job resources to be generated.
 func (f *JobsFeature) iHaveGeneratedThreeJobsInTheJobStore() error {
+	go func() {
+		for msgInBytes := range f.MessageProducer.Channels().Output {
+			fmt.Printf("message received: %v", msgInBytes)
+		}
+	}()
+
 	// call POST /jobs three times
 	err := f.callPostJobs()
 	if err != nil {
@@ -582,6 +584,12 @@ func (f *JobsFeature) iHaveGeneratedThreeJobsInTheJobStore() error {
 // iHaveGeneratedSixJobsInTheJobStore is a feature step that can be defined for a specific JobsFeature.
 // It calls POST /jobs with an empty body, three times, which causes three default job resources to be generated.
 func (f *JobsFeature) iHaveGeneratedSixJobsInTheJobStore() error {
+	go func() {
+		for msgInBytes := range f.MessageProducer.Channels().Output {
+			fmt.Printf("message received: %v", msgInBytes)
+		}
+	}()
+
 	// call POST /jobs five times
 	err := f.callPostJobs()
 	if err != nil {
@@ -1056,6 +1064,40 @@ func (f *JobsFeature) iGETJobsidtasksUsingTheGeneratedID() error {
 // It closes the connection to the search feature so as to mimic losing the connection to the Search API.
 func (f *JobsFeature) theSearchReindexAPILosesItsConnectionToTheSearchAPI() error {
 	f.SearchFeature.Close()
+	return f.ErrorFeature.StepError()
+}
+
+func (f *JobsFeature) iPOSTJobsAndInspectTheReindexrequestedEventProduced() error {
+	var outputData []byte
+
+	quit := make(chan bool)
+	go func() {
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				outputData = <-f.MessageProducer.Channels().Output
+				fmt.Printf("outputData 1 is: %v", outputData)
+			}
+		}
+	}()
+
+	err := f.callPostJobs()
+	if err != nil {
+		return fmt.Errorf("an error occurred in callPostJobs: %w", err)
+	}
+	fmt.Printf("outputData 2 is: %v", outputData)
+	//expectedJobID := id
+	expectedSearchIndexName := "ons1638363874110115"
+	var data = &models.ReindexRequested{}
+	schema.ReindexRequestedEvent.Unmarshal(outputData, data)
+	//assert.Equal(&f.ErrorFeature, expectedJobID, data.JobID)
+	assert.Equal(&f.ErrorFeature, expectedSearchIndexName, data.SearchIndex)
+
+	// Quit goroutine
+	//quit <- true
+	fmt.Printf("here 4")
 	return f.ErrorFeature.StepError()
 }
 

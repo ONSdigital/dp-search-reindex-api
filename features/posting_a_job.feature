@@ -3,9 +3,7 @@ Feature: Posting a job
   Scenario: Job is posted successfully
 
     Given the search api is working correctly
-    When I POST "/jobs"
-    """
-    """
+    When I POST /jobs and inspect the reindex-requested event produced
     Then the response should contain values that have these structures
       | id                | UUID                                  |
       | last_updated      | Not in the future                     |
@@ -21,6 +19,7 @@ Feature: Posting a job
       | total_search_documents          | 0                         |
       | total_inserted_search_documents | 0                         |
     And the HTTP status code should be "201"
+#    And the reindex-requested event should contain the expected job id and search index name
 
   Scenario: The connection to mongo DB is lost and a post request returns an internal server error
 
