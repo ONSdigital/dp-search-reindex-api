@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -75,6 +76,7 @@ type JobsFeature struct {
 	KafkaProducer        service.KafkaProducer
 	MessageProducer      kafka.IProducer
 	reindexRequestedData *models.ReindexRequested
+	featureId            int
 }
 
 // NewJobsFeature returns a pointer to a new JobsFeature, which can then be used for testing the /jobs endpoint.
@@ -85,6 +87,7 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
 		HTTPServer:     &http.Server{},
 		errorChan:      make(chan error),
 		ServiceRunning: false,
+		featureId:      rand.New(rand.NewSource(time.Now().UnixNano())).Int(),
 	}
 	svcErrors := make(chan error, 1)
 	cfg, err := config.Get()
@@ -1087,28 +1090,21 @@ func (f *JobsFeature) theSearchReindexAPILosesItsConnectionToTheSearchAPI() erro
 }
 
 func (f *JobsFeature) iPOSTJobsAndInspectTheReindexrequestedEventProduced() error {
-	var outputData []byte
 
-	go func() {
-		for {
-			outputData = <-f.MessageProducer.Channels().Output
-			fmt.Printf("outputData is: %v", outputData)
-		}
-	}()
+	quit := make(chan bool)
+	defer close(quit)
 
-	//f.readOutputMessages()
+	f.readOutputMessages(quit)
 	err := f.callPostJobs()
 	if err != nil {
 		return fmt.Errorf("an error occurred in callPostJobs: %w", err)
 	}
+
 	var response models.Job
 	err = f.readResponse(err, response)
 	if err != nil {
 		return err
 	}
-
-	//f.reindexRequestedData = &models.ReindexRequested{}
-	schema.ReindexRequestedEvent.Unmarshal(outputData, f.reindexRequestedData)
 
 	return f.ErrorFeature.StepError()
 }
@@ -1261,16 +1257,22 @@ func funcCheck(ctx context.Context, state *healthcheck.CheckState) error {
 	return nil
 }
 
-func (f *JobsFeature) readOutputMessages() error {
+func (f *JobsFeature) readOutputMessages(quit chan bool) {
 	var outputData []byte
 
+	fmt.Printf("Starting readOutputMessages for %v", f.featureId)
 	go func() {
 		for {
-			outputData = <-f.MessageProducer.Channels().Output
-			fmt.Printf("outputData is: %v", outputData)
+			select {
+			case outputData = <-f.MessageProducer.Channels().Output:
+				err := schema.ReindexRequestedEvent.Unmarshal(outputData, f.reindexRequestedData)
+				if err != nil {
+					panic(err)
+				}
+			case <-quit:
+				fmt.Printf("Quitting readOutputMessages goroutine for %v", f.featureId)
+				return
+			}
 		}
 	}()
-
-	//f.reindexRequestedData = &models.ReindexRequested{}
-	return schema.ReindexRequestedEvent.Unmarshal(outputData, f.reindexRequestedData)
 }
