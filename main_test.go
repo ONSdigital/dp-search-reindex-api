@@ -82,7 +82,6 @@ func (f *ComponentTest) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 	})
 }
 func TestComponent(t *testing.T) {
-
 	if *componentFlag {
 		status := 0
 		var opts = godog.Options{
