@@ -3,10 +3,9 @@ Feature: Posting a job
   Scenario: Job is posted successfully
 
     Given the search api is working correctly
-#    When I POST "/jobs"
-#    """
-#    """
-    When I POST /jobs and inspect the reindex-requested event produced
+    When I POST "/jobs"
+    """
+    """
     Then the response should contain values that have these structures
       | id                | UUID                                  |
       | last_updated      | Not in the future                     |
