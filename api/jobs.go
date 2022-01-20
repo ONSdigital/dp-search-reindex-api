@@ -73,7 +73,7 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} else {
-		newJob, err = api.updateSearchIndexName(ctx, reindexResponse, err, newJob, id)
+		newJob, err = api.updateSearchIndexName(ctx, reindexResponse, newJob, id)
 		if err != nil {
 			log.Error(ctx, "error occurred in updateSearchIndexName function", err)
 			newJob.State = models.JobStateFailed
@@ -276,7 +276,7 @@ func closeResponseBody(ctx context.Context, resp *http.Response) {
 
 // updateSearchIndexName calls the GetIndexNameFromResponse function, in the reindex package, to get the index name that was returned by the Search API.
 // It then calls the UpdateIndexName function, in the mongo package, to update the search_index_name value in the relevant Job Resource in the data store.
-func (api *API) updateSearchIndexName(ctx context.Context, reindexResponse *http.Response, searchErr error, newJob models.Job, id string) (models.Job, error) {
+func (api *API) updateSearchIndexName(ctx context.Context, reindexResponse *http.Response, newJob models.Job, id string) (models.Job, error) {
 	defer closeResponseBody(ctx, reindexResponse)
 
 	indexName, err := api.reindex.GetIndexNameFromResponse(ctx, reindexResponse.Body)
