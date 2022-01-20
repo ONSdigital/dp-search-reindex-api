@@ -11,8 +11,8 @@ import (
 
 // Possible values of a job's state
 const (
-	JobStateCreated = "created"	// this is the default value of state in a new job
-	JobStateFailed = "failed"
+	JobStateCreated = "created" // this is the default value of state in a new job
+	JobStateFailed  = "failed"
 )
 
 // Job represents a job metadata model and json representation for API
