@@ -76,10 +76,10 @@ func TestProducer(t *testing.T) {
 		})
 
 		Convey("When Close is called, But the kafka producer returns an error, Then the error should be returned", func() {
-			expectedError := errors.New("an error")
-			fakeKafkaProducer.ReturnError(expectedError)
+			kafkaProviderError := errors.New("an error")
+			fakeKafkaProducer.ReturnError(kafkaProviderError)
 			actualError := sut.Close(context.Background())
-			So(expectedError, ShouldEqual, actualError)
+			So(actualError, ShouldEqual, kafkaProviderError)
 		})
 
 		Convey("When Checker is called, Then the kafka producer checker should be called", func() {
@@ -89,10 +89,10 @@ func TestProducer(t *testing.T) {
 		})
 
 		Convey("When Checker is called, But the kafka producer returns an error, Then the error should be returned", func() {
-			expectedError := errors.New("an error")
-			fakeKafkaProducer.ReturnError(expectedError)
+			kafkaProviderError := errors.New("an error")
+			fakeKafkaProducer.ReturnError(kafkaProviderError)
 			actualError := sut.Checker(context.Background(), checkState)
-			So(actualError, ShouldEqual, expectedError)
+			So(actualError, ShouldEqual, kafkaProviderError)
 		})
 
 		Convey("When produce reindex request is called", func() {
@@ -107,7 +107,7 @@ func TestProducer(t *testing.T) {
 			})
 
 			Convey("When produce reindex request is called, Then it should send the marshalled event to the producer's Output channel", func() {
-				actualSentMessage := <-fakeKafkaProducer.ProducerChannels.Output
+				actualSentMessage := readFromOutputChannel(fakeKafkaProducer)
 				So(actualSentMessage, ShouldResemble, fakeMarshalledRequest)
 			})
 		})
@@ -122,10 +122,22 @@ func TestProducer(t *testing.T) {
 			})
 
 			Convey("Then it should not send a message to the kafka producer", func() {
-				So(fakeKafkaProducer.CloseCalls, ShouldHaveLength, 0)
+				actualSentMessage := readFromOutputChannel(fakeKafkaProducer)
+				So(actualSentMessage, ShouldBeNil)
 			})
 		})
 	})
+}
+
+func readFromOutputChannel(fakeKafkaProducer *FakeKafkaProducer) []byte {
+	var actualSentMessage []byte
+	select {
+	case actualSentMessage = <-fakeKafkaProducer.ProducerChannels.Output:
+		// we just need to read the message
+	default:
+		// do nothing
+	}
+	return actualSentMessage
 }
 
 // A mock marshaller
