@@ -63,7 +63,7 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		}
 	} else if reindexResponse.StatusCode != 201 {
-		log.Error(ctx, "error occurred in post search http request", err)
+		log.Info(ctx, "unexpected status returned by the search api", log.Data{"status returned by search api": reindexResponse.Status})
 		newJob.State = models.JobStateFailed
 		log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
 		setStateErr := api.dataStore.UpdateJobState(models.JobStateFailed, newJob.ID)
