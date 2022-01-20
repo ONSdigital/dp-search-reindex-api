@@ -51,9 +51,9 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 	log.Info(ctx, "creating new index in ElasticSearch via the Search API")
 	serviceAuthToken := "Bearer " + api.cfg.ServiceAuthToken
 	searchAPISearchURL := api.cfg.SearchAPIURL + "/search"
-	reindexResponse, err := api.reindex.CreateIndex(ctx, serviceAuthToken, searchAPISearchURL, api.httpClient)
-	if err != nil {
-		log.Error(ctx, "error occurred when connecting to Search API", err)
+	reindexResponse, errCreateIndex := api.reindex.CreateIndex(ctx, serviceAuthToken, searchAPISearchURL, api.httpClient)
+	if errCreateIndex != nil {
+		log.Error(ctx, "error occurred when connecting to Search API", errCreateIndex)
 		newJob.State = models.JobStateFailed
 		log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
 		setStateErr := api.dataStore.UpdateJobState(models.JobStateFailed, newJob.ID)
@@ -278,7 +278,6 @@ func closeResponseBody(ctx context.Context, resp *http.Response) {
 // It then calls the UpdateIndexName function, in the mongo package, to update the search_index_name value in the relevant Job Resource in the data store.
 func (api *API) updateSearchIndexName(ctx context.Context, reindexResponse *http.Response, newJob models.Job, id string) (models.Job, error) {
 	defer closeResponseBody(ctx, reindexResponse)
-
 	indexName, err := api.reindex.GetIndexNameFromResponse(ctx, reindexResponse.Body)
 	if err != nil {
 		log.Error(ctx, "failed to get index name from response", err)
