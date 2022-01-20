@@ -2,8 +2,6 @@ package service
 
 import (
 	"context"
-	"github.com/ONSdigital/dp-search-reindex-api/event"
-	"github.com/ONSdigital/dp-search-reindex-api/schema"
 	"net/http"
 
 	"github.com/ONSdigital/dp-api-clients-go/health"
@@ -13,7 +11,9 @@ import (
 	dpHTTP "github.com/ONSdigital/dp-net/http"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
+	"github.com/ONSdigital/dp-search-reindex-api/event"
 	"github.com/ONSdigital/dp-search-reindex-api/mongo"
+	"github.com/ONSdigital/dp-search-reindex-api/schema"
 	"github.com/ONSdigital/log.go/v2/log"
 )
 

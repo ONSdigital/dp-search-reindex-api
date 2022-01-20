@@ -3,11 +3,11 @@ package api
 import (
 	"context"
 	"encoding/json"
-	"github.com/ONSdigital/dp-net/request"
 	"math"
 	"net/http"
 	"strconv"
 
+	"github.com/ONSdigital/dp-net/request"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
 	"github.com/ONSdigital/dp-search-reindex-api/mongo"
 	"github.com/ONSdigital/dp-search-reindex-api/pagination"
@@ -90,7 +90,7 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 				}
 			}
 		} else {
-			//As the index name was updated successfully we can send a reindex-requested event
+			// As the index name was updated successfully we can send a reindex-requested event
 			traceID := request.NewRequestID(16)
 			reindexReqEvent := models.ReindexRequested{
 				JobID:       newJob.ID,
@@ -100,7 +100,7 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 
 			log.Info(ctx, "sending reindex-requested event", log.Data{"reindexRequestedEvent": reindexReqEvent})
 
-			if err := api.producer.ProduceReindexRequested(ctx, reindexReqEvent); err != nil {
+			if err = api.producer.ProduceReindexRequested(ctx, reindexReqEvent); err != nil {
 				log.Error(ctx, "error while attempting to send reindex-requested event to producer", err)
 				http.Error(w, serverErrorMessage, http.StatusInternalServerError)
 				return

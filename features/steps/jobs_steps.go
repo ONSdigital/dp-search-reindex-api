@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -70,9 +69,8 @@ type JobsFeature struct {
 	KafkaProducer        service.KafkaProducer
 	MessageProducer      kafka.IProducer
 	reindexRequestedData *models.ReindexRequested
-	featureId            int
 	quitReadingOutput    chan bool
-	createdJob			 models.Job
+	createdJob           models.Job
 }
 
 // NewJobsFeature returns a pointer to a new JobsFeature, which can then be used for testing the /jobs endpoint.
@@ -83,7 +81,6 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
 		HTTPServer:     &http.Server{},
 		errorChan:      make(chan error),
 		ServiceRunning: false,
-		featureId:      rand.New(rand.NewSource(time.Now().UnixNano())).Int(),
 	}
 	svcErrors := make(chan error, 1)
 	cfg, err := config.Get()
@@ -201,7 +198,7 @@ func (f *JobsFeature) RegisterSteps(ctx *godog.ScenarioContext) {
 	ctx.Step(`^in each job I would expect the response to contain values that have these structures$`, f.inEachJobIWouldExpectTheResponseToContainValuesThatHaveTheseStructures)
 	ctx.Step(`^the search reindex api loses its connection to the search api$`, f.theSearchReindexAPILosesItsConnectionToTheSearchAPI)
 	ctx.Step(`^the response should contain a state of "([^"]*)"$`, f.theResponseShouldContainAStateOf)
-	ctx.Step(`^the reindex-requested event should contain the expected job id and search index name$`, f.theReindexrequestedEventShouldContainTheExpectedJobIdAndSearchIndexName)
+	ctx.Step(`^the reindex-requested event should contain the expected job ID and search index name$`, f.theReindexrequestedEventShouldContainTheExpectedJobIDAndSearchIndexName)
 }
 
 // iAmNotIdentifiedByZebedee is a feature step that can be defined for a specific JobsFeature.
@@ -1034,10 +1031,10 @@ func (f *JobsFeature) theSearchReindexAPILosesItsConnectionToTheSearchAPI() erro
 	return f.ErrorFeature.StepError()
 }
 
-// theReindexrequestedEventShouldContainTheExpectedJobIdAndSearchIndexName is a feature step that can be defined for a specific JobsFeature.
+// theReindexrequestedEventShouldContainTheExpectedJobIDAndSearchIndexName is a feature step that can be defined for a specific JobsFeature.
 // It asserts that the job id and search index name that get returned by the POST /jobs endpoint match the ones that get sent in the
 // reindex-requested event
-func (f *JobsFeature) theReindexrequestedEventShouldContainTheExpectedJobIdAndSearchIndexName() error {
+func (f *JobsFeature) theReindexrequestedEventShouldContainTheExpectedJobIDAndSearchIndexName() error {
 	assert.Equal(&f.ErrorFeature, f.createdJob.ID, f.reindexRequestedData.JobID)
 	assert.Equal(&f.ErrorFeature, f.createdJob.SearchIndexName, f.reindexRequestedData.SearchIndex)
 	return f.ErrorFeature.StepError()
@@ -1189,7 +1186,7 @@ func funcCheck(ctx context.Context, state *healthcheck.CheckState) error {
 func (f *JobsFeature) readOutputMessages() {
 	var outputData []byte
 
-	fmt.Printf("Starting readOutputMessages for %v", f.featureId)
+	fmt.Printf("Starting readOutputMessages goroutine")
 	go func() {
 		for {
 			select {
@@ -1199,7 +1196,7 @@ func (f *JobsFeature) readOutputMessages() {
 					panic(err)
 				}
 			case <-f.quitReadingOutput:
-				fmt.Printf("Quitting readOutputMessages goroutine for %v", f.featureId)
+				fmt.Printf("Quitting readOutputMessages goroutine")
 				return
 			}
 		}
