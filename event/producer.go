@@ -3,6 +3,7 @@ package event
 import (
 	"context"
 	"errors"
+	"fmt"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	kafka "github.com/ONSdigital/dp-kafka/v2"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
@@ -28,12 +29,12 @@ func (p ReindexRequestedProducer) ProduceReindexRequested(ctx context.Context, e
 	if err := p.ensureDependencies(); err != nil {
 		return err
 	}
-	//bytes, err := p.Marshaller.Marshal(event)
-	//if err != nil {
-	//	log.Fatal(ctx, "Marshaller.Marshal", err)
-	//	return fmt.Errorf(fmt.Sprintf("Marshaller.Marshal returned an error: event=%v: %%w", event), err)
-	//}
-	//p.Producer.Channels().Output <- bytes
+	bytes, err := p.Marshaller.Marshal(event)
+	if err != nil {
+		//	log.Fatal(ctx, "Marshaller.Marshal", err)
+		return fmt.Errorf(fmt.Sprintf("Marshaller.Marshal returned an error: event=%v: %%w", event), err)
+	}
+	p.Producer.Channels().Output <- bytes
 	//log.Info(ctx, "completed successfully", log.Data{"event": event, "package": "event.ReindexRequestedProducer"})
 	return nil
 }
@@ -53,8 +54,7 @@ func (p ReindexRequestedProducer) Close(ctx context.Context) error {
 	if err := p.ensureDependencies(); err != nil {
 		return err
 	}
-	p.Producer.Close(ctx)
-	return nil
+	return p.Producer.Close(ctx)
 }
 
 // Checker is called by the healthcheck library to check the health state of this kafka producer instance
@@ -62,6 +62,5 @@ func (p *ReindexRequestedProducer) Checker(ctx context.Context, state *healthche
 	if err := p.ensureDependencies(); err != nil {
 		return err
 	}
-	p.Producer.Checker(ctx, state)
-	return nil
+	return p.Producer.Checker(ctx, state)
 }

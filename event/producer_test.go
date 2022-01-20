@@ -2,6 +2,7 @@ package event_test
 
 import (
 	"context"
+	"errors"
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	kafka "github.com/ONSdigital/dp-kafka/v2"
 	"github.com/ONSdigital/dp-search-reindex-api/event"
@@ -13,9 +14,9 @@ import (
 func TestProducer(t *testing.T) {
 
 	fakeKafkaProducer := &FakeKafkaProducer{}
-	reindexRequestedEvent := models.ReindexRequested{}
+	reindexRequestedEvent := models.ReindexRequested{JobID: "job id", SearchIndex: "search index", TraceID: "trace id"}
 	checkState := healthcheck.NewCheckState("test")
-	fakeMarshaller := FakeMarshaller{}
+	fakeMarshaller := &FakeMarshaller{}
 
 	Convey("Given the producer is initialized without a marshaller", t, func() {
 		sut := event.ReindexRequestedProducer{Marshaller: nil, Producer: fakeKafkaProducer}
@@ -63,6 +64,10 @@ func TestProducer(t *testing.T) {
 	})
 
 	Convey("Given an initialized producer", t, func() {
+
+		fakeKafkaProducer = &FakeKafkaProducer{ProducerChannels: kafka.CreateProducerChannels()}
+		fakeKafkaProducer.ProducerChannels.Output = make(chan []byte, 9999) // output will buffer what it receives, so we can inspect it below
+
 		sut := event.ReindexRequestedProducer{Marshaller: fakeMarshaller, Producer: fakeKafkaProducer}
 
 		Convey("When Close is called, Then the kafka producer should be closed", func() {
@@ -72,56 +77,128 @@ func TestProducer(t *testing.T) {
 
 		})
 
+		Convey("When Close is called, But the kafka producer returns an error, Then the error should be returned", func() {
+			expectedError := errors.New("an error")
+			fakeKafkaProducer.ReturnError(expectedError)
+			actualError := sut.Close(context.Background())
+			So(expectedError, ShouldEqual, actualError)
+
+		})
+
 		Convey("When Checker is called, Then the kafka producer checker should be called", func() {
 			sut.Checker(context.Background(), checkState)
 			So(fakeKafkaProducer.CheckerCalls, ShouldHaveLength, 1)
-			So(fakeKafkaProducer.CheckerCalls[0], ShouldResemble,
-				checkerCall{context.Background(), checkState})
+			So(fakeKafkaProducer.CheckerCalls[0], ShouldResemble, checkerCall{context.Background(), checkState})
 
+		})
+
+		Convey("When Checker is called, But the kafka producer returns an error, Then the error should be returned", func() {
+			expectedError := errors.New("an error")
+			fakeKafkaProducer.ReturnError(expectedError)
+			actualError := sut.Checker(context.Background(), checkState)
+			So(actualError, ShouldEqual, expectedError)
+
+		})
+
+		Convey("When produce reindex request is called", func() {
+
+			fakeMarshalledRequest := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
+			fakeMarshaller.ReturnBytes(fakeMarshalledRequest)
+
+			sut.ProduceReindexRequested(context.Background(), reindexRequestedEvent)
+
+			Convey("Then it should marshall the request as expected", func() {
+				So(fakeMarshaller.MarshalCalls, ShouldHaveLength, 1)
+				So(fakeMarshaller.MarshalCalls[0], ShouldResemble, reindexRequestedEvent)
+
+			})
+
+			Convey("When produce reindex request is called, Then it should send the marshalled event to the producer's Output channel", func() {
+				actualSentMessage := <-fakeKafkaProducer.ProducerChannels.Output
+				So(actualSentMessage, ShouldResemble, fakeMarshalledRequest)
+
+			})
+
+		})
+
+		Convey("When produce reindex request is called, But the marshaller returns an error", func() {
+			fakeMarshaller.ReturnError(errors.New("marshal error"))
+
+			actualError := sut.ProduceReindexRequested(context.Background(), reindexRequestedEvent)
+
+			Convey("Then the producer returns an error regarding the marshaller", func() {
+				So(actualError.Error(), ShouldContainSubstring, "marshal error")
+
+			})
+
+			Convey("Then it should not send a message to the kafka producer", func() {
+				So(fakeKafkaProducer.CloseCalls, ShouldHaveLength, 0)
+
+			})
 		})
 	})
 
 }
 
+// A mock marshaller
 type FakeMarshaller struct {
+	BytesToReturn []byte
+	MarshalCalls  []interface{}
+	ErrorToReturn error
 }
 
-func (FakeMarshaller) Marshal(s interface{}) ([]byte, error) {
-	//TODO implement me
-	panic("implement me")
+func (f *FakeMarshaller) Marshal(s interface{}) ([]byte, error) {
+	f.MarshalCalls = append(f.MarshalCalls, s)
+	if f.ErrorToReturn != nil {
+		return nil, f.ErrorToReturn
+	}
+	return f.BytesToReturn, nil
 }
 
-type checkerCall struct {
-	Context    context.Context
-	CheckState *healthcheck.CheckState
+func (f *FakeMarshaller) ReturnBytes(request []byte) {
+	f.BytesToReturn = request
 }
+
+func (f *FakeMarshaller) ReturnError(err error) {
+	f.ErrorToReturn = err
+}
+
+// A mock IKafkaProducer
 type FakeKafkaProducer struct {
-	CloseCalls   []context.Context
-	CheckerCalls []checkerCall
+	CloseCalls       []context.Context
+	CheckerCalls     []checkerCall
+	ErrorToReturn    error
+	ProducerChannels *kafka.ProducerChannels
 }
 
 func (f *FakeKafkaProducer) Channels() *kafka.ProducerChannels {
-	//TODO implement me
-	panic("implement me")
+	return f.ProducerChannels
 }
 
 func (f *FakeKafkaProducer) IsInitialised() bool {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (f *FakeKafkaProducer) Initialise(ctx context.Context) error {
-	//TODO implement me
 	panic("implement me")
 }
 
 func (f *FakeKafkaProducer) Checker(ctx context.Context, state *healthcheck.CheckState) error {
-	//TODO implement me
 	f.CheckerCalls = append(f.CheckerCalls, checkerCall{ctx, state})
-	return nil
+	return f.ErrorToReturn
 }
 
 func (f *FakeKafkaProducer) Close(ctx context.Context) (err error) {
 	f.CloseCalls = append(f.CloseCalls, ctx)
-	return nil
+	return f.ErrorToReturn
+}
+
+func (f *FakeKafkaProducer) ReturnError(err error) {
+	f.ErrorToReturn = err
+}
+
+// a fake type which represents a call to IKafkaProducer.Checker
+type checkerCall struct {
+	Context    context.Context
+	CheckState *healthcheck.CheckState
 }
