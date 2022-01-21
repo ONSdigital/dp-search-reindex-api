@@ -54,34 +54,19 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 	reindexResponse, errCreateIndex := api.reindex.CreateIndex(ctx, serviceAuthToken, searchAPISearchURL, api.httpClient)
 	if errCreateIndex != nil {
 		log.Error(ctx, "error occurred when connecting to Search API", errCreateIndex)
-		newJob.State = models.JobStateFailed
-		log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
-		setStateErr := api.dataStore.UpdateJobState(models.JobStateFailed, newJob.ID)
-		if setStateErr != nil {
-			log.Error(ctx, "setting state to failed has failed", setStateErr)
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		if !updateJobStateToFailed(ctx, w, &newJob, api) {
 			return
 		}
 	} else if reindexResponse.StatusCode != 201 {
 		log.Info(ctx, "unexpected status returned by the search api", log.Data{"status returned by search api": reindexResponse.Status})
-		newJob.State = models.JobStateFailed
-		log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
-		setStateErr := api.dataStore.UpdateJobState(models.JobStateFailed, newJob.ID)
-		if setStateErr != nil {
-			log.Error(ctx, "setting state to failed has failed", setStateErr)
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		if !updateJobStateToFailed(ctx, w, &newJob, api) {
 			return
 		}
 	} else {
 		newJob, err = api.updateSearchIndexName(ctx, reindexResponse, newJob, id)
 		if err != nil {
 			log.Error(ctx, "error occurred in updateSearchIndexName function", err)
-			newJob.State = models.JobStateFailed
-			log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
-			setStateErr := api.dataStore.UpdateJobState(models.JobStateFailed, newJob.ID)
-			if setStateErr != nil {
-				log.Error(ctx, "setting state to failed has failed", setStateErr)
-				http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+			if !updateJobStateToFailed(ctx, w, &newJob, api) {
 				return
 			}
 		} else {
@@ -119,6 +104,19 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
 		return
 	}
+}
+
+// updateJobStateToFailed returns true if the job state was successfully updated to failed
+func updateJobStateToFailed(ctx context.Context, w http.ResponseWriter, newJob *models.Job, api *API) bool {
+	newJob.State = models.JobStateFailed
+	log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
+	setStateErr := api.dataStore.UpdateJobState(models.JobStateFailed, newJob.ID)
+	if setStateErr != nil {
+		log.Error(ctx, "setting state to failed has failed", setStateErr)
+		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		return false
+	}
+	return true
 }
 
 // GetJobHandler returns a function that gets an existing Job resource, from the Job Store, that's associated with the id passed in.
