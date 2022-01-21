@@ -60,18 +60,13 @@ func (f *ComponentTest) InitializeScenario(godogCtx *godog.ScenarioContext) {
 }
 func (f *ComponentTest) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 	ctxBackground := context.Background()
-	ctx.BeforeSuite(func() {
-		log.SetDestination(io.Discard, io.Discard)
-		golog.SetOutput(io.Discard)
 
+	ctx.BeforeSuite(func() {
 		f.MongoFeature = componentTest.NewMongoFeature(componentTest.MongoOptions{MongoVersion: MongoVersion, DatabaseName: DatabaseName})
 		f.AuthFeature = componentTest.NewAuthorizationFeature()
 		f.SearchFeature = steps.NewSearchFeature()
 	})
 	ctx.AfterSuite(func() {
-		log.SetDestination(os.Stdout, os.Stderr)
-		golog.SetOutput(os.Stdout)
-
 		err := f.MongoFeature.Close()
 		if err != nil {
 			log.Error(ctxBackground, "error occurred while closing the MongoFeature", err)
@@ -83,6 +78,14 @@ func (f *ComponentTest) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 }
 func TestComponent(t *testing.T) {
 	if *componentFlag {
+
+		log.SetDestination(io.Discard, io.Discard)
+		golog.SetOutput(io.Discard)
+		//defer func() {
+		//	log.SetDestination(os.Stdout, os.Stderr)
+		//	golog.SetOutput(os.Stdout)
+		//}()
+
 		status := 0
 		var opts = godog.Options{
 			Output: colors.Colored(os.Stdout),

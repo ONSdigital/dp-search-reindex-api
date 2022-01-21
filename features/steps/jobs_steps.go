@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -54,23 +55,23 @@ var (
 
 // JobsFeature is a type that contains all the requirements for running a godog (cucumber) feature that tests the /jobs endpoint.
 type JobsFeature struct {
-	ErrorFeature         componentTest.ErrorFeature
-	svc                  *service.Service
-	errorChan            chan error
-	Config               *config.Config
-	HTTPServer           *http.Server
-	ServiceRunning       bool
-	APIFeature           *componentTest.APIFeature
-	responseBody         []byte
-	MongoClient          *mongo.JobStore
-	MongoFeature         *componentTest.MongoFeature
-	AuthFeature          *componentTest.AuthorizationFeature
-	SearchFeature        *SearchFeature
-	KafkaProducer        service.KafkaProducer
-	MessageProducer      kafka.IProducer
-	reindexRequestedData *models.ReindexRequested
-	quitReadingOutput    chan bool
-	createdJob           models.Job
+	ErrorFeature            componentTest.ErrorFeature
+	svc                     *service.Service
+	errorChan               chan error
+	Config                  *config.Config
+	HTTPServer              *http.Server
+	ServiceRunning          bool
+	APIFeature              *componentTest.APIFeature
+	responseBody            []byte
+	MongoClient             *mongo.JobStore
+	MongoFeature            *componentTest.MongoFeature
+	AuthFeature             *componentTest.AuthorizationFeature
+	SearchFeature           *SearchFeature
+	KafkaProducer           service.KafkaProducer
+	MessageProducer         kafka.IProducer
+	quitReadingOutput       chan bool
+	createdJob              models.Job
+	kafkaProducerOutputData chan []byte
 }
 
 // NewJobsFeature returns a pointer to a new JobsFeature, which can then be used for testing the /jobs endpoint.
@@ -115,7 +116,8 @@ func NewJobsFeature(mongoFeature *componentTest.MongoFeature,
 		Producer:   messageProducer,
 	}
 	f.KafkaProducer = kafkaProducer
-	f.reindexRequestedData = &models.ReindexRequested{}
+
+	f.kafkaProducerOutputData = make(chan []byte, 9999)
 	f.quitReadingOutput = make(chan bool)
 	f.readOutputMessages()
 
@@ -1035,9 +1037,13 @@ func (f *JobsFeature) theSearchReindexAPILosesItsConnectionToTheSearchAPI() erro
 // It asserts that the job id and search index name that get returned by the POST /jobs endpoint match the ones that get sent in the
 // reindex-requested event
 func (f *JobsFeature) theReindexrequestedEventShouldContainTheExpectedJobIDAndSearchIndexName() error {
-	assert.Equal(&f.ErrorFeature, f.createdJob.ID, f.reindexRequestedData.JobID)
-	assert.Equal(&f.ErrorFeature, f.createdJob.SearchIndexName, f.reindexRequestedData.SearchIndex)
-	return f.ErrorFeature.StepError()
+	reindexRequestedData, err := readAndDeserializeKafkaProducerOutput(f.kafkaProducerOutputData)
+	if err != nil {
+		return err
+	}
+	assert.Equal(&f.ErrorFeature, f.createdJob.ID, reindexRequestedData.JobID)
+	assert.Equal(&f.ErrorFeature, f.createdJob.SearchIndexName, reindexRequestedData.SearchIndex)
+	return nil
 }
 
 // GetJobByID is a utility function that is used for calling the GET /jobs/{id} endpoint.
@@ -1184,23 +1190,29 @@ func funcCheck(ctx context.Context, state *healthcheck.CheckState) error {
 
 // readOutputMessages is a utility method to read the kafka messages that get sent to the producer's output channel
 func (f *JobsFeature) readOutputMessages() {
-	var outputData []byte
-
-	fmt.Printf("Starting readOutputMessages goroutine")
 	go func() {
 		for {
 			select {
-			case outputData = <-f.MessageProducer.Channels().Output:
-				err := schema.ReindexRequestedEvent.Unmarshal(outputData, f.reindexRequestedData)
-				if err != nil {
-					panic(err)
-				}
+			case f.kafkaProducerOutputData <- <-f.MessageProducer.Channels().Output:
+				log.Println("read")
 			case <-f.quitReadingOutput:
-				fmt.Printf("Quitting readOutputMessages goroutine")
 				return
 			}
 		}
 	}()
+}
+
+func readAndDeserializeKafkaProducerOutput(kafkaProducerOutputData <-chan []byte) (*models.ReindexRequested, error) {
+	var reindexRequestedDataBytes []byte
+	for {
+		select {
+		case reindexRequestedDataBytes = <-kafkaProducerOutputData:
+			log.Println("read")
+			reindexRequestedData := &models.ReindexRequested{}
+			err := schema.ReindexRequestedEvent.Unmarshal(reindexRequestedDataBytes, reindexRequestedData)
+			return reindexRequestedData, err
+		}
+	}
 }
 
 // readResponse is a utility method to read the JSON response that gets returned by the POST /job endpoint
