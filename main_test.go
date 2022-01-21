@@ -60,9 +60,11 @@ func (f *ComponentTest) InitializeScenario(godogCtx *godog.ScenarioContext) {
 }
 func (f *ComponentTest) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 	ctxBackground := context.Background()
+
+	log.SetDestination(io.Discard, io.Discard)
+	golog.SetOutput(io.Discard)
+
 	ctx.BeforeSuite(func() {
-		log.SetDestination(io.Discard, io.Discard)
-		golog.SetOutput(io.Discard)
 
 		f.MongoFeature = componentTest.NewMongoFeature(componentTest.MongoOptions{MongoVersion: MongoVersion, DatabaseName: DatabaseName})
 		f.AuthFeature = componentTest.NewAuthorizationFeature()
