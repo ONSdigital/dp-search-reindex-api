@@ -39,6 +39,7 @@ func (r *Reindex) GetIndexNameFromResponse(ctx context.Context, body io.ReadClos
 	logData := log.Data{"response_body": string(b)}
 	readBodyFailedMsg := "failed to read response body"
 	unmarshalBodyFailedMsg := "failed to unmarshal response body"
+	responseBodyEmptyMsg := "response body empty"
 
 	if err != nil {
 		log.Error(ctx, readBodyFailedMsg, err, logData)
@@ -46,7 +47,8 @@ func (r *Reindex) GetIndexNameFromResponse(ctx context.Context, body io.ReadClos
 	}
 
 	if len(b) == 0 {
-		b = []byte("[response body empty]")
+		log.Error(ctx, responseBodyEmptyMsg, err, logData)
+		return "", ErrResponseBodyEmpty
 	}
 
 	var newIndexName NewIndexName
