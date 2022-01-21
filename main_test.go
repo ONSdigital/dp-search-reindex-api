@@ -78,13 +78,13 @@ func (f *ComponentTest) InitializeTestSuite(ctx *godog.TestSuiteContext) {
 }
 func TestComponent(t *testing.T) {
 	if *componentFlag {
-
 		log.SetDestination(io.Discard, io.Discard)
 		golog.SetOutput(io.Discard)
-		//defer func() {
-		//	log.SetDestination(os.Stdout, os.Stderr)
-		//	golog.SetOutput(os.Stdout)
-		//}()
+		// Commented out pending fix for log.go library:
+		// defer func() {
+		//	 log.SetDestination(os.Stdout, os.Stderr)
+		//	 golog.SetOutput(os.Stdout)
+		// }()
 
 		status := 0
 		var opts = godog.Options{

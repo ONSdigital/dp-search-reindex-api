@@ -1203,16 +1203,12 @@ func (f *JobsFeature) readOutputMessages() {
 }
 
 func readAndDeserializeKafkaProducerOutput(kafkaProducerOutputData <-chan []byte) (*models.ReindexRequested, error) {
-	var reindexRequestedDataBytes []byte
-	for {
-		select {
-		case reindexRequestedDataBytes = <-kafkaProducerOutputData:
-			log.Println("read")
-			reindexRequestedData := &models.ReindexRequested{}
-			err := schema.ReindexRequestedEvent.Unmarshal(reindexRequestedDataBytes, reindexRequestedData)
-			return reindexRequestedData, err
-		}
+	for reindexRequestedDataBytes := range kafkaProducerOutputData {
+		reindexRequestedData := &models.ReindexRequested{}
+		err := schema.ReindexRequestedEvent.Unmarshal(reindexRequestedDataBytes, reindexRequestedData)
+		return reindexRequestedData, err
 	}
+	return nil, nil
 }
 
 // readResponse is a utility method to read the JSON response that gets returned by the POST /job endpoint
