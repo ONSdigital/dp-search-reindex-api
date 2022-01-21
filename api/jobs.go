@@ -282,9 +282,9 @@ func (api *API) updateSearchIndexName(ctx context.Context, reindexResponse *http
 	if err != nil {
 		log.Error(ctx, "failed to get index name from response", err)
 		if newJob != (models.Job{}) {
-			newJob.State = "failed"
+			newJob.State = models.JobStateFailed
 			log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
-			setStateErr := api.dataStore.UpdateJobState("failed", newJob.ID)
+			setStateErr := api.dataStore.UpdateJobState(models.JobStateFailed, newJob.ID)
 			if setStateErr != nil {
 				log.Error(ctx, "setting state to failed has failed", setStateErr)
 				return newJob, setStateErr
