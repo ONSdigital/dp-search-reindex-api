@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/ONSdigital/dp-healthcheck/healthcheck"
 	kafka "github.com/ONSdigital/dp-kafka/v2"
@@ -36,9 +37,15 @@ func (p ReindexRequestedProducer) ProduceReindexRequested(ctx context.Context, e
 		log.Fatal(ctx, "Marshaller.Marshal", err)
 		return fmt.Errorf(fmt.Sprintf("Marshaller.Marshal returned an error: event=%v: %%w", event), err)
 	}
-	p.Producer.Channels().Output <- bytes
-	log.Info(ctx, "completed successfully", log.Data{"event": event, "package": "event.ReindexRequestedProducer"})
-	return nil
+	var timeout = time.Second * 5
+	select {
+	case p.Producer.Channels().Output <- bytes:
+		log.Info(ctx, "completed successfully", log.Data{"event": event, "package": "event.ReindexRequestedProducer"})
+		return nil
+	case <-time.After(timeout):
+		log.Fatal(ctx, "Producer Output channel failed to read bytes", err)
+		return fmt.Errorf(fmt.Sprintf("Producer Output channel failed to read reindex-requested event: event=%v: %%w", event), err)
+	}
 }
 
 func (p ReindexRequestedProducer) ensureDependencies() error {
