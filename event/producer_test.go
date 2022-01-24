@@ -129,13 +129,16 @@ func TestProducer(t *testing.T) {
 	})
 
 	Convey("Given an initialized producer that has an incorrectly configured Output channel", t, func() {
-		fakeBrokenKafkaProducer := &FakeBrokenKafkaProducer{ProducerChannels: kafka.CreateProducerChannels()}
+		fakeKafkaProducer := &FakeKafkaProducer{ProducerChannels: kafka.CreateProducerChannels()}
 
-		fakeBrokenKafkaProducer.ProducerChannels.Output = nil
+		// The buffer size is the number of elements that can be sent to the channel without the send blocking.
+		// By giving the producer channel a buffer size of 0 this means that every single send will block.
+		fakeKafkaProducer.ProducerChannels.Output = make(chan []byte)
+
 		fakeMarshaller := &FakeMarshaller{}
-		fakeMarshaller.ErrorToReturn = nil
+		fakeMarshaller.ErrorToReturn = nil // The marshaller should work correctly
 
-		sut := event.ReindexRequestedProducer{Marshaller: fakeMarshaller, Producer: fakeBrokenKafkaProducer}
+		sut := event.ReindexRequestedProducer{Marshaller: fakeMarshaller, Producer: fakeKafkaProducer}
 
 		Convey("When produce reindex request is called", func() {
 			fakeMarshalledRequest := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8, 9}
@@ -148,10 +151,11 @@ func TestProducer(t *testing.T) {
 				So(fakeMarshaller.MarshalCalls[0], ShouldResemble, reindexRequestedEvent)
 			})
 
-			Convey("Then it should wait 5 seconds and fail to send the marshalled event to the producer's Output channel", func() {
+			Convey("Then it should wait 5 seconds and fail to send the marshalled event to the producer's blocked Output channel", func() {
 				So(produceEventErr.Error(), ShouldContainSubstring, "Producer Output channel failed to read reindex-requested event")
-				actualSentMessage := readFromBlockedOutputChannel(fakeBrokenKafkaProducer)
-				So(actualSentMessage, ShouldResemble, []byte(nil))
+				actualSentMessage := readFromOutputChannel(fakeKafkaProducer)
+				fakeEmptyRequest := []byte(nil)
+				So(actualSentMessage, ShouldResemble, fakeEmptyRequest)
 			})
 		})
 	})
@@ -161,17 +165,6 @@ func readFromOutputChannel(fakeKafkaProducer *FakeKafkaProducer) []byte {
 	var actualSentMessage []byte
 	select {
 	case actualSentMessage = <-fakeKafkaProducer.ProducerChannels.Output:
-		// we just need to read the message
-	default:
-		// do nothing
-	}
-	return actualSentMessage
-}
-
-func readFromBlockedOutputChannel(fakeBrokenKafkaProducer *FakeBrokenKafkaProducer) []byte {
-	var actualSentMessage []byte
-	select {
-	case actualSentMessage = <-fakeBrokenKafkaProducer.ProducerChannels.Output:
 		// we just need to read the message
 	default:
 		// do nothing
@@ -210,43 +203,15 @@ type FakeKafkaProducer struct {
 	ProducerChannels *kafka.ProducerChannels
 }
 
-// A mock IKafkaProducer that fails to read bytes from its Output channel
-type FakeBrokenKafkaProducer struct {
-	CloseCalls       []context.Context
-	CheckerCalls     []checkerCall
-	ErrorToReturn    error
-	ProducerChannels *kafka.ProducerChannels
-}
-
 func (f *FakeKafkaProducer) Channels() *kafka.ProducerChannels {
 	return f.ProducerChannels
-}
-
-func (g *FakeBrokenKafkaProducer) Channels() *kafka.ProducerChannels {
-	// The buffer size is the number of elements that can be sent to the channel without the send blocking.
-	// By default, a channel has a buffer size of 0 (you get this with make(chan int)).
-	// This means that every single send will block until another goroutine receives from the channel.
-	g.ProducerChannels = &kafka.ProducerChannels{
-		//Output: make(chan []byte, 0),
-		Output: nil,
-	}
-
-	return g.ProducerChannels
 }
 
 func (f *FakeKafkaProducer) IsInitialised() bool {
 	panic("implement me")
 }
 
-func (g *FakeBrokenKafkaProducer) IsInitialised() bool {
-	panic("implement me")
-}
-
 func (f *FakeKafkaProducer) Initialise(ctx context.Context) error {
-	panic("implement me")
-}
-
-func (g *FakeBrokenKafkaProducer) Initialise(ctx context.Context) error {
 	panic("implement me")
 }
 
@@ -255,19 +220,9 @@ func (f *FakeKafkaProducer) Checker(ctx context.Context, state *healthcheck.Chec
 	return f.ErrorToReturn
 }
 
-func (g *FakeBrokenKafkaProducer) Checker(ctx context.Context, state *healthcheck.CheckState) error {
-	g.CheckerCalls = append(g.CheckerCalls, checkerCall{ctx, state})
-	return g.ErrorToReturn
-}
-
 func (f *FakeKafkaProducer) Close(ctx context.Context) (err error) {
 	f.CloseCalls = append(f.CloseCalls, ctx)
 	return f.ErrorToReturn
-}
-
-func (g *FakeBrokenKafkaProducer) Close(ctx context.Context) (err error) {
-	g.CloseCalls = append(g.CloseCalls, ctx)
-	return g.ErrorToReturn
 }
 
 func (f *FakeKafkaProducer) ReturnError(err error) {
