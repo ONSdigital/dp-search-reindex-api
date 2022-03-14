@@ -15,6 +15,7 @@ import (
 	dpHTTP "github.com/ONSdigital/dp-net/v2/http"
 	"github.com/ONSdigital/dp-search-reindex-api/api"
 	apiMock "github.com/ONSdigital/dp-search-reindex-api/api/mock"
+	"github.com/ONSdigital/dp-search-reindex-api/apierrors"
 	"github.com/ONSdigital/dp-search-reindex-api/config"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
 	"github.com/ONSdigital/dp-search-reindex-api/mongo"
@@ -59,6 +60,9 @@ func TestCreateJobHandler(t *testing.T) {
 			}
 		},
 		UpdateIndexNameFunc: func(indexName, jobID string) error {
+			return nil
+		},
+		UpdateJobStateFunc: func(state, jobID string) error {
 			return nil
 		},
 	}
@@ -125,22 +129,25 @@ func TestCreateJobHandler(t *testing.T) {
 	})
 
 	Convey("Given a Search Reindex Job API that can create valid search reindex jobs and store their details in a Data Store", t, func() {
-		api.NewID = func() string { return validJobID2 }
 		cfg, err := config.Get()
 		So(err, ShouldBeNil)
 		httpClient := dpHTTP.NewClient()
 		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock, producerMock)
 
-		Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
-			req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
-			resp := httptest.NewRecorder()
+		Convey("And an existing job is in progress", func() {
+			api.NewID = func() string { return validJobID2 }
 
-			apiInstance.CreateJobHandler(resp, req)
+			Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+				req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+				resp := httptest.NewRecorder()
 
-			Convey("Then an empty search reindex job is returned with status code 409 because an existing job is in progress", func() {
-				So(resp.Code, ShouldEqual, http.StatusConflict)
-				errMsg := strings.TrimSpace(resp.Body.String())
-				So(errMsg, ShouldEqual, "existing reindex job in progress")
+				apiInstance.CreateJobHandler(resp, req)
+
+				Convey("Then an empty search reindex job is returned with status code 409", func() {
+					So(resp.Code, ShouldEqual, http.StatusConflict)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, "existing reindex job in progress")
+				})
 			})
 		})
 	})
@@ -162,6 +169,197 @@ func TestCreateJobHandler(t *testing.T) {
 				So(resp.Code, ShouldEqual, http.StatusInternalServerError)
 				errMsg := strings.TrimSpace(resp.Body.String())
 				So(errMsg, ShouldEqual, expectedServerErrorMsg)
+			})
+		})
+	})
+
+	Convey("Given a Search Reindex Job API that can create valid search reindex jobs and store their details in a Data Store", t, func() {
+		api.NewID = func() string { return validJobID1 }
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+
+		Convey("And connection to Search API has failed", func() {
+			errorIndexerMock := &apiMock.IndexerMock{
+				CreateIndexFunc: func(ctx context.Context, serviceAuthToken, searchAPISearchURL string, httpClient dpHTTP.Clienter) (*http.Response, error) {
+					return nil, fmt.Errorf(expectedServerErrorMsg)
+				},
+			}
+
+			Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+				req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+				resp := httptest.NewRecorder()
+
+				apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, errorIndexerMock, producerMock)
+				apiInstance.CreateJobHandler(resp, req)
+
+				Convey("Then an empty search reindex job is returned with status code 500", func() {
+					So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, expectedServerErrorMsg)
+				})
+			})
+
+			Convey("And updating job state to `failed` has failed", func() {
+				failedStateMock := *dataStorerMock
+				failedStateMock.UpdateJobStateFunc = func(state, jobID string) error {
+					return apierrors.ErrInternalServer
+				}
+				failedStateDataStorerMock := &failedStateMock
+
+				Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+					req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+					resp := httptest.NewRecorder()
+
+					apiInstance := api.Setup(mux.NewRouter(), failedStateDataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, errorIndexerMock, producerMock)
+					apiInstance.CreateJobHandler(resp, req)
+
+					Convey("Then an empty search reindex job is returned with status code 500", func() {
+						So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+						errMsg := strings.TrimSpace(resp.Body.String())
+						So(errMsg, ShouldEqual, expectedServerErrorMsg)
+					})
+				})
+			})
+		})
+	})
+
+	Convey("Given a Search Reindex Job API that can create valid search reindex jobs and store their details in a Data Store", t, func() {
+		api.NewID = func() string { return validJobID1 }
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+
+		Convey("And an unexpected status code is returned by Search API", func() {
+			unexpectedStatusIndexerMock := &apiMock.IndexerMock{
+				CreateIndexFunc: func(ctx context.Context, serviceAuthToken, searchAPISearchURL string, httpClient dpHTTP.Clienter) (*http.Response, error) {
+					resp := &http.Response{
+						StatusCode: 202,
+					}
+					return resp, nil
+				},
+			}
+
+			Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+				req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+				resp := httptest.NewRecorder()
+
+				apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, unexpectedStatusIndexerMock, producerMock)
+				apiInstance.CreateJobHandler(resp, req)
+
+				Convey("Then an empty search reindex job is returned with status code 500", func() {
+					So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, expectedServerErrorMsg)
+				})
+			})
+
+			Convey("And updating job state to `failed` has failed", func() {
+				failedStateMock := *dataStorerMock
+				failedStateMock.UpdateJobStateFunc = func(state, jobID string) error {
+					return apierrors.ErrInternalServer
+				}
+				failedStateDataStorerMock := &failedStateMock
+
+				Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+					req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+					resp := httptest.NewRecorder()
+
+					apiInstance := api.Setup(mux.NewRouter(), failedStateDataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, unexpectedStatusIndexerMock, producerMock)
+					apiInstance.CreateJobHandler(resp, req)
+
+					Convey("Then an empty search reindex job is returned with status code 500", func() {
+						So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+						errMsg := strings.TrimSpace(resp.Body.String())
+						So(errMsg, ShouldEqual, expectedServerErrorMsg)
+					})
+				})
+			})
+		})
+	})
+
+	Convey("Given a Search Reindex Job API that can create valid search reindex jobs and store their details in a Data Store", t, func() {
+		api.NewID = func() string { return validJobID1 }
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+
+		Convey("And an error occurred when updating search index name", func() {
+			errorUpdateIndexNameIndexerMock := &apiMock.IndexerMock{
+				CreateIndexFunc: func(ctx context.Context, serviceAuthToken, searchAPISearchURL string, httpClient dpHTTP.Clienter) (*http.Response, error) {
+					resp := &http.Response{
+						StatusCode: 201,
+					}
+					return resp, nil
+				},
+				GetIndexNameFromResponseFunc: func(ctx context.Context, body io.ReadCloser) (string, error) {
+					return "", apierrors.ErrInternalServer
+				},
+			}
+
+			Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+				req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+				resp := httptest.NewRecorder()
+
+				apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, errorUpdateIndexNameIndexerMock, producerMock)
+				apiInstance.CreateJobHandler(resp, req)
+
+				Convey("Then an empty search reindex job is returned with status code 500", func() {
+					So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, expectedServerErrorMsg)
+				})
+			})
+
+			Convey("And updating job state to `failed` has failed", func() {
+				failedStateMock := *dataStorerMock
+				failedStateMock.UpdateJobStateFunc = func(state, jobID string) error {
+					return apierrors.ErrInternalServer
+				}
+				failedStateDataStorerMock := &failedStateMock
+
+				Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+					req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+					resp := httptest.NewRecorder()
+
+					apiInstance := api.Setup(mux.NewRouter(), failedStateDataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, errorUpdateIndexNameIndexerMock, producerMock)
+					apiInstance.CreateJobHandler(resp, req)
+
+					Convey("Then an empty search reindex job is returned with status code 500", func() {
+						So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+						errMsg := strings.TrimSpace(resp.Body.String())
+						So(errMsg, ShouldEqual, expectedServerErrorMsg)
+					})
+				})
+			})
+		})
+	})
+
+	Convey("Given a Search Reindex Job API that can create valid search reindex jobs and store their details in a Data Store", t, func() {
+		api.NewID = func() string { return validJobID1 }
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+
+		Convey("And an error occurred when sending reindex-requested event to producer", func() {
+			errorProducerMock := &apiMock.ReindexRequestedProducerMock{
+				ProduceReindexRequestedFunc: func(ctx context.Context, event models.ReindexRequested) error {
+					return apierrors.ErrInternalServer
+				},
+			}
+
+			Convey("When the jobs endpoint is called to create and store a new reindex job", func() {
+				req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
+				resp := httptest.NewRecorder()
+
+				apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, indexerMock, errorProducerMock)
+				apiInstance.CreateJobHandler(resp, req)
+
+				Convey("Then an empty search reindex job is returned with status code 500", func() {
+					So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, expectedServerErrorMsg)
+				})
 			})
 		})
 	})

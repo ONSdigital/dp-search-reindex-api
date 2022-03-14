@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/ONSdigital/dp-search-reindex-api/apierrors"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
 	"github.com/ONSdigital/dp-search-reindex-api/mongo"
 	"github.com/ONSdigital/log.go/v2/log"
@@ -38,7 +39,7 @@ func (api *API) CreateTaskHandler(w http.ResponseWriter, req *http.Request) {
 		if err == mongo.ErrJobNotFound {
 			http.Error(w, "Failed to find job that has the specified id", http.StatusNotFound)
 		} else {
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+			http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -46,7 +47,7 @@ func (api *API) CreateTaskHandler(w http.ResponseWriter, req *http.Request) {
 	jsonResponse, err := json.Marshal(newTask)
 	if err != nil {
 		log.Error(ctx, "marshalling response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -55,7 +56,7 @@ func (api *API) CreateTaskHandler(w http.ResponseWriter, req *http.Request) {
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Error(ctx, "writing response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -76,7 +77,7 @@ func (api *API) GetTaskHandler(w http.ResponseWriter, req *http.Request) {
 		} else if err == mongo.ErrTaskNotFound {
 			http.Error(w, "failed to find task for the specified job id", http.StatusNotFound)
 		} else {
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+			http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -85,7 +86,7 @@ func (api *API) GetTaskHandler(w http.ResponseWriter, req *http.Request) {
 	jsonResponse, err := json.Marshal(task)
 	if err != nil {
 		log.Error(ctx, "marshalling response failed", err, logData)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -93,7 +94,7 @@ func (api *API) GetTaskHandler(w http.ResponseWriter, req *http.Request) {
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Error(ctx, "writing response failed", err, logData)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -124,7 +125,7 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, req *http.Request) {
 			return
 		default:
 			log.Error(ctx, "getting list of tasks failed", err)
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+			http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
@@ -133,7 +134,7 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, req *http.Request) {
 	jsonResponse, err := json.Marshal(tasks)
 	if err != nil {
 		log.Error(ctx, "marshalling response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -141,7 +142,7 @@ func (api *API) GetTasksHandler(w http.ResponseWriter, req *http.Request) {
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Error(ctx, "writing response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 }

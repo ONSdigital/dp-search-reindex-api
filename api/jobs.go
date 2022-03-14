@@ -30,8 +30,6 @@ var (
 	NewID = func() string {
 		return uuid.NewV4().String()
 	}
-
-	serverErrorMessage = "internal server error"
 )
 
 // CreateJobHandler generates a new Job resource and a new ElasticSearch index associated with it	.
@@ -40,91 +38,97 @@ func (api *API) CreateJobHandler(w http.ResponseWriter, req *http.Request) {
 	id := NewID()
 
 	log.Info(ctx, "creating new job resource in the data store")
+
+	// create a new job
 	newJob, err := api.dataStore.CreateJob(ctx, id)
 	if err != nil {
 		log.Error(ctx, "creating and storing job failed", err)
 		if err == mongo.ErrExistingJobInProgress {
 			http.Error(w, "existing reindex job in progress", http.StatusConflict)
 		} else {
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+			http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		}
-		return
-	}
-	if newJob == (models.Job{}) {
-		log.Info(ctx, "an empty job resource was returned by the data store")
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	log.Info(ctx, "creating new index in ElasticSearch via the Search API")
+
 	serviceAuthToken := "Bearer " + api.cfg.ServiceAuthToken
 	searchAPISearchURL := api.cfg.SearchAPIURL + "/search"
+
+	// create a new elasticsearch index
 	reindexResponse, errCreateIndex := api.reindex.CreateIndex(ctx, serviceAuthToken, searchAPISearchURL, api.httpClient)
 	if errCreateIndex != nil {
 		log.Error(ctx, "error occurred when connecting to Search API", errCreateIndex)
-		if !updateJobStateToFailed(ctx, w, &newJob, api) {
-			return
+		if setStateErr := updateJobStateToFailed(ctx, &newJob, api); setStateErr != nil {
+			log.Error(ctx, "failed to update job state to `failed`", setStateErr)
 		}
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
+		return
+
 	} else if reindexResponse.StatusCode != 201 {
 		log.Info(ctx, "unexpected status returned by the search api", log.Data{"status returned by search api": reindexResponse.Status})
-		if !updateJobStateToFailed(ctx, w, &newJob, api) {
-			return
+		if setStateErr := updateJobStateToFailed(ctx, &newJob, api); setStateErr != nil {
+			log.Error(ctx, "failed to update job state to `failed`", setStateErr)
 		}
-	} else {
-		newJob, err = api.updateSearchIndexName(ctx, reindexResponse, newJob, id)
-		if err != nil {
-			log.Error(ctx, "error occurred in updateSearchIndexName function", err)
-			if !updateJobStateToFailed(ctx, w, &newJob, api) {
-				return
-			}
-		} else {
-			// As the index name was updated successfully we can send a reindex-requested event
-			traceID := dprequest.NewRequestID(16)
-			reindexReqEvent := models.ReindexRequested{
-				JobID:       newJob.ID,
-				SearchIndex: newJob.SearchIndexName,
-				TraceID:     traceID,
-			}
-
-			log.Info(ctx, "sending reindex-requested event", log.Data{"reindexRequestedEvent": reindexReqEvent})
-
-			if err = api.producer.ProduceReindexRequested(ctx, reindexReqEvent); err != nil {
-				log.Error(ctx, "error while attempting to send reindex-requested event to producer", err)
-				http.Error(w, serverErrorMessage, http.StatusInternalServerError)
-				return
-			}
-			log.Info(ctx, "reindex request has been processed")
-		}
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
+		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
+	// update search index name in new job
+	newJob, err = api.updateSearchIndexName(ctx, reindexResponse, newJob, id)
+	if err != nil {
+		log.Error(ctx, "error occurred in updateSearchIndexName function", err)
+		if setStateErr := updateJobStateToFailed(ctx, &newJob, api); setStateErr != nil {
+			log.Error(ctx, "failed to update job state to `failed`", setStateErr)
+		}
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// As the index name was updated successfully we can send a reindex-requested event
+	traceID := dprequest.NewRequestID(16)
+	reindexReqEvent := models.ReindexRequested{
+		JobID:       newJob.ID,
+		SearchIndex: newJob.SearchIndexName,
+		TraceID:     traceID,
+	}
+
+	log.Info(ctx, "sending reindex-requested event", log.Data{"reindexRequestedEvent": reindexReqEvent})
+
+	if err = api.producer.ProduceReindexRequested(ctx, reindexReqEvent); err != nil {
+		log.Error(ctx, "error while attempting to send reindex-requested event to producer", err)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Info(ctx, "reindex request has been processed")
+	w.WriteHeader(http.StatusCreated)
+
 	jsonResponse, err := json.Marshal(newJob)
 	if err != nil {
 		log.Error(ctx, "marshalling response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Error(ctx, "writing response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
 }
 
-// updateJobStateToFailed returns true if the job state was successfully updated to failed
-func updateJobStateToFailed(ctx context.Context, w http.ResponseWriter, newJob *models.Job, api *API) bool {
+// updateJobStateToFailed sets the job state to failed
+func updateJobStateToFailed(ctx context.Context, newJob *models.Job, api *API) error {
 	newJob.State = models.JobFailedState
 	log.Info(ctx, "updating job state to failed", log.Data{"job id": newJob.ID})
 	setStateErr := api.dataStore.UpdateJobState(models.JobFailedState, newJob.ID)
-	if setStateErr != nil {
-		log.Error(ctx, "setting state to failed has failed", setStateErr)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
-		return false
-	}
-	return true
+
+	return setStateErr
 }
 
 // GetJobHandler returns a function that gets an existing Job resource, from the Job Store, that's associated with the id passed in.
@@ -137,7 +141,7 @@ func (api *API) GetJobHandler(w http.ResponseWriter, req *http.Request) {
 	lockID, err := api.dataStore.AcquireJobLock(ctx, id)
 	if err != nil {
 		log.Error(ctx, "acquiring lock for job ID failed", err, logData)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer api.unlockJob(ctx, lockID)
@@ -148,7 +152,7 @@ func (api *API) GetJobHandler(w http.ResponseWriter, req *http.Request) {
 		if err == mongo.ErrJobNotFound {
 			http.Error(w, "Failed to find job in job store", http.StatusNotFound)
 		} else {
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+			http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -157,7 +161,7 @@ func (api *API) GetJobHandler(w http.ResponseWriter, req *http.Request) {
 	jsonResponse, err := json.Marshal(job)
 	if err != nil {
 		log.Error(ctx, "marshalling response failed", err, logData)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -165,7 +169,7 @@ func (api *API) GetJobHandler(w http.ResponseWriter, req *http.Request) {
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Error(ctx, "writing response failed", err, logData)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -188,7 +192,7 @@ func (api *API) GetJobsHandler(w http.ResponseWriter, req *http.Request) {
 	jobs, err := api.dataStore.GetJobs(ctx, offset, limit)
 	if err != nil {
 		log.Error(ctx, "getting list of jobs failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -196,7 +200,7 @@ func (api *API) GetJobsHandler(w http.ResponseWriter, req *http.Request) {
 	jsonResponse, err := json.Marshal(jobs)
 	if err != nil {
 		log.Error(ctx, "marshalling response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -204,7 +208,7 @@ func (api *API) GetJobsHandler(w http.ResponseWriter, req *http.Request) {
 	_, err = w.Write(jsonResponse)
 	if err != nil {
 		log.Error(ctx, "writing response failed", err)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -251,7 +255,7 @@ func (api *API) PutNumTasksHandler(w http.ResponseWriter, req *http.Request) {
 	lockID, err := api.dataStore.AcquireJobLock(ctx, id)
 	if err != nil {
 		log.Error(ctx, "acquiring lock for job ID failed", err, logData)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer api.unlockJob(ctx, lockID)
@@ -262,7 +266,7 @@ func (api *API) PutNumTasksHandler(w http.ResponseWriter, req *http.Request) {
 		if err == mongo.ErrJobNotFound {
 			http.Error(w, "Failed to find job in job store", http.StatusNotFound)
 		} else {
-			http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+			http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		}
 		return
 	}
@@ -364,7 +368,7 @@ func (api *API) PatchJobStatusHandler(w http.ResponseWriter, req *http.Request) 
 	lockID, err := api.dataStore.AcquireJobLock(ctx, jobID)
 	if err != nil {
 		log.Error(ctx, "acquiring lock for job ID failed", err, logData)
-		http.Error(w, serverErrorMessage, http.StatusInternalServerError)
+		http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer api.unlockJob(ctx, lockID)
