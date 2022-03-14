@@ -75,7 +75,7 @@ func (api *API) GetTaskHandler(w http.ResponseWriter, req *http.Request) {
 		if err == mongo.ErrJobNotFound {
 			http.Error(w, "failed to find task - job id is invalid", http.StatusNotFound)
 		} else if err == mongo.ErrTaskNotFound {
-			http.Error(w, "failed to find task for the specified job id", http.StatusNotFound)
+			http.Error(w, "failed to find task for the specified task name", http.StatusNotFound)
 		} else {
 			http.Error(w, apierrors.ErrInternalServer.Error(), http.StatusInternalServerError)
 		}

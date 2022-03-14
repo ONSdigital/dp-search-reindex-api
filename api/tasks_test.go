@@ -34,6 +34,7 @@ const (
 	invalidTaskName       = "any-word-not-in-valid-list"
 	validServiceAuthToken = "Bearer fc4089e2e12937861377629b0cd96cf79298a4c5d329a2ebb96664c88df77b67"
 	bindAddress           = "localhost:25700"
+	testNoOfDocs          = 5
 )
 
 // Create Task Payload
@@ -91,7 +92,7 @@ func TestCreateTaskHandler(t *testing.T) {
 				expectedTask, err := ExpectedTask(validJobID1, zeroTime, 5, validTaskName1)
 				So(err, ShouldBeNil)
 
-				Convey("And the new task resource should contain expected 	values", func() {
+				Convey("And the new task resource should contain expected values", func() {
 					So(newTask.JobID, ShouldEqual, expectedTask.JobID)
 					So(newTask.Links, ShouldResemble, expectedTask.Links)
 					So(newTask.NumberOfDocuments, ShouldEqual, expectedTask.NumberOfDocuments)
@@ -195,6 +196,136 @@ func TestCreateTaskHandler(t *testing.T) {
 				So(resp.Code, ShouldEqual, http.StatusBadRequest)
 				errMsg := strings.TrimSpace(resp.Body.String())
 				So(errMsg, ShouldEqual, "invalid request body")
+			})
+		})
+	})
+}
+
+func TestGetTaskHandler(t *testing.T) {
+	dataStorerMock := &apiMock.DataStorerMock{
+		GetTaskFunc: func(ctx context.Context, jobID, taskName string) (models.Task, error) {
+			emptyTask := models.Task{}
+
+			switch taskName {
+			case emptyTaskName:
+				return emptyTask, apierrors.ErrEmptyTaskNameProvided
+			case invalidTaskName:
+				return emptyTask, mongo.ErrTaskNotFound
+			}
+
+			switch jobID {
+			case validJobID1:
+				return models.NewTask(jobID, taskName, testNoOfDocs, bindAddress), nil
+			case invalidJobID:
+				return emptyTask, mongo.ErrJobNotFound
+			default:
+				return emptyTask, errors.New("an unexpected error occurred")
+			}
+		},
+	}
+
+	Convey("Given an API that can create valid search reindex tasks and store their details in a Data Store", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
+
+		Convey("And valid job id and task name is given", func() {
+			req := httptest.NewRequest("GET", fmt.Sprintf("http://localhost:25700/jobs/%s/tasks/%s", validJobID1, validTaskName1), nil)
+
+			Convey("When GetTaskHandler is called", func() {
+				resp := httptest.NewRecorder()
+
+				apiInstance.Router.ServeHTTP(resp, req)
+
+				Convey("Then the search reindex task should be retrieved with status code 200", func() {
+					So(resp.Code, ShouldEqual, http.StatusOK)
+					payload, err := io.ReadAll(resp.Body)
+					So(err, ShouldBeNil)
+					task := models.Task{}
+					err = json.Unmarshal(payload, &task)
+					So(err, ShouldBeNil)
+
+					Convey("And the task resource should contain expected values", func() {
+						zeroTime := time.Time{}.UTC()
+						expectedTask, err := ExpectedTask(validJobID1, zeroTime, testNoOfDocs, validTaskName1)
+						So(err, ShouldBeNil)
+
+						So(task.JobID, ShouldEqual, expectedTask.JobID)
+						So(task.Links, ShouldResemble, expectedTask.Links)
+						So(task.NumberOfDocuments, ShouldEqual, expectedTask.NumberOfDocuments)
+						So(task.TaskName, ShouldEqual, expectedTask.TaskName)
+					})
+				})
+			})
+		})
+	})
+
+	Convey("Given an API that can create valid search reindex tasks and store their details in a Data Store", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
+
+		Convey("And an invalid job id is given", func() {
+			req := httptest.NewRequest("GET", fmt.Sprintf("http://localhost:25700/jobs/%s/tasks/%s", invalidJobID, validTaskName1), nil)
+
+			Convey("When GetTaskHandler is called", func() {
+				resp := httptest.NewRecorder()
+
+				apiInstance.Router.ServeHTTP(resp, req)
+
+				Convey("Then the search reindex task should be retrieved with status code 200", func() {
+					So(resp.Code, ShouldEqual, http.StatusNotFound)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, "failed to find task - job id is invalid")
+				})
+			})
+		})
+	})
+
+	Convey("Given an API that can create valid search reindex tasks and store their details in a Data Store", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
+
+		Convey("And an invalid task name is given", func() {
+			req := httptest.NewRequest("GET", fmt.Sprintf("http://localhost:25700/jobs/%s/tasks/%s", validJobID1, invalidTaskName), nil)
+
+			Convey("When GetTaskHandler is called", func() {
+				resp := httptest.NewRecorder()
+
+				apiInstance.Router.ServeHTTP(resp, req)
+
+				Convey("Then the search reindex task should be retrieved with status code 200", func() {
+					So(resp.Code, ShouldEqual, http.StatusNotFound)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, "failed to find task for the specified task name")
+				})
+			})
+		})
+	})
+
+	Convey("Given an API that can create valid search reindex tasks and store their details in a Data Store", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
+
+		Convey("And an unexpected error occurs when getting task", func() {
+			req := httptest.NewRequest("GET", fmt.Sprintf("http://localhost:25700/jobs/%s/tasks/%s", "invalid", validTaskName1), nil)
+
+			Convey("When GetTaskHandler is called", func() {
+				resp := httptest.NewRecorder()
+
+				apiInstance.Router.ServeHTTP(resp, req)
+
+				Convey("Then the search reindex task should be retrieved with status code 200", func() {
+					So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, apierrors.ErrInternalServer.Error())
+				})
 			})
 		})
 	})
