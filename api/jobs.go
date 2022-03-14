@@ -401,14 +401,14 @@ func (api *API) PatchJobStatusHandler(w http.ResponseWriter, req *http.Request) 
 	bsonUpdates[models.JobETagBSONKey] = newETag
 
 	// update job with the request patches
-	// err = api.dataStore.UpdateJobWithPatches(jobID, bsonUpdates)
-	// if err != nil {
-	// 	logData["bson_updates"] = bsonUpdates
+	err = api.dataStore.UpdateJobWithPatches(jobID, bsonUpdates)
+	if err != nil {
+		logData["bson_updates"] = bsonUpdates
 
-	// 	log.Error(ctx, "failed to update job in mongo with patch operations", err)
-	// 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	// 	return
-	// }
+		log.Error(ctx, "failed to update job in mongo with patch operations", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	err = headers.SetETag(req, newETag)
 	if err != nil {

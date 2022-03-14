@@ -545,42 +545,6 @@ func TestGetJobsHandlerWithInternalServerError(t *testing.T) {
 	})
 }
 
-// ExpectedJob returns a Job resource that can be used to define and test expected values within it.
-func ExpectedJob(id string,
-	lastUpdated time.Time,
-	numberOfTasks int,
-	reindexCompleted time.Time,
-	reindexFailed time.Time,
-	reindexStarted time.Time,
-	searchIndexName string,
-	state string,
-	totalSearchDocuments int,
-	totalInsertedSearchDocuments int) (models.Job, error) {
-	cfg, err := config.Get()
-	if err != nil {
-		return models.Job{}, fmt.Errorf("%s: %w", errors.New("unable to retrieve service configuration"), err)
-	}
-	urlBuilder := url.NewBuilder("http://" + cfg.BindAddr)
-	self := urlBuilder.BuildJobURL(id)
-	tasks := urlBuilder.BuildJobTasksURL(id)
-	return models.Job{
-		ID:          id,
-		LastUpdated: lastUpdated,
-		Links: &models.JobLinks{
-			Tasks: tasks,
-			Self:  self,
-		},
-		NumberOfTasks:                numberOfTasks,
-		ReindexCompleted:             reindexCompleted,
-		ReindexFailed:                reindexFailed,
-		ReindexStarted:               reindexStarted,
-		SearchIndexName:              searchIndexName,
-		State:                        state,
-		TotalSearchDocuments:         totalSearchDocuments,
-		TotalInsertedSearchDocuments: totalInsertedSearchDocuments,
-	}, err
-}
-
 func TestPutNumTasksHandler(t *testing.T) {
 	t.Parallel()
 	Convey("Given a Search Reindex Job API that updates the number of tasks for specific jobs using their id as a key", t, func() {
@@ -689,4 +653,40 @@ func TestPutNumTasksHandler(t *testing.T) {
 			})
 		})
 	})
+}
+
+// ExpectedJob returns a Job resource that can be used to define and test expected values within it.
+func ExpectedJob(id string,
+	lastUpdated time.Time,
+	numberOfTasks int,
+	reindexCompleted time.Time,
+	reindexFailed time.Time,
+	reindexStarted time.Time,
+	searchIndexName string,
+	state string,
+	totalSearchDocuments int,
+	totalInsertedSearchDocuments int) (models.Job, error) {
+	cfg, err := config.Get()
+	if err != nil {
+		return models.Job{}, fmt.Errorf("%s: %w", errors.New("unable to retrieve service configuration"), err)
+	}
+	urlBuilder := url.NewBuilder("http://" + cfg.BindAddr)
+	self := urlBuilder.BuildJobURL(id)
+	tasks := urlBuilder.BuildJobTasksURL(id)
+	return models.Job{
+		ID:          id,
+		LastUpdated: lastUpdated,
+		Links: &models.JobLinks{
+			Tasks: tasks,
+			Self:  self,
+		},
+		NumberOfTasks:                numberOfTasks,
+		ReindexCompleted:             reindexCompleted,
+		ReindexFailed:                reindexFailed,
+		ReindexStarted:               reindexStarted,
+		SearchIndexName:              searchIndexName,
+		State:                        state,
+		TotalSearchDocuments:         totalSearchDocuments,
+		TotalInsertedSearchDocuments: totalInsertedSearchDocuments,
+	}, err
 }
