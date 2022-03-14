@@ -36,6 +36,12 @@ const (
 	bindAddress           = "localhost:25700"
 )
 
+// Create Task Payload
+var createTaskPayloadFmt = `{
+	"task_name": "%s",
+	"number_of_documents": 5
+}`
+
 func TestCreateTaskHandler(t *testing.T) {
 	dataStorerMock := &apiMock.DataStorerMock{
 		CreateTaskFunc: func(ctx context.Context, jobID string, taskName string, numDocuments int) (models.Task, error) {
@@ -101,19 +107,48 @@ func TestCreateTaskHandler(t *testing.T) {
 		httpClient := dpHTTP.NewClient()
 		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
 
-		Convey("When the tasks endpoint is called to create and store a new reindex task", func() {
+		Convey("And job ID is invalid", func() {
 			req := httptest.NewRequest("POST", fmt.Sprintf("http://localhost:25700/jobs/%s/tasks", invalidJobID), bytes.NewBufferString(
 				fmt.Sprintf(createTaskPayloadFmt, validTaskName2)))
-			req.Header.Set("Content-Type", "application/json")
-			req.Header.Set("Authorization", validServiceAuthToken)
-			resp := httptest.NewRecorder()
 
-			apiInstance.Router.ServeHTTP(resp, req)
+			Convey("When the tasks endpoint is called to create and store a new reindex task", func() {
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", validServiceAuthToken)
+				resp := httptest.NewRecorder()
 
-			Convey("Then an empty search reindex job is returned with status code 404 because the job id was invalid", func() {
-				So(resp.Code, ShouldEqual, http.StatusNotFound)
-				errMsg := strings.TrimSpace(resp.Body.String())
-				So(errMsg, ShouldEqual, "Failed to find job that has the specified id")
+				apiInstance.Router.ServeHTTP(resp, req)
+
+				Convey("Then an empty search reindex job is returned with status code 404", func() {
+					So(resp.Code, ShouldEqual, http.StatusNotFound)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, "Failed to find job that has the specified id")
+				})
+			})
+		})
+	})
+
+	Convey("Given an API that can create valid search reindex tasks and store their details in a Data Store", t, func() {
+		cfg, err := config.Get()
+		So(err, ShouldBeNil)
+		httpClient := dpHTTP.NewClient()
+		apiInstance := api.Setup(mux.NewRouter(), dataStorerMock, &apiMock.AuthHandlerMock{}, taskNames, cfg, httpClient, &apiMock.IndexerMock{}, &apiMock.ReindexRequestedProducerMock{})
+
+		Convey("And an error occurred for creating and storing a task", func() {
+			req := httptest.NewRequest("POST", fmt.Sprintf("http://localhost:25700/jobs/%s/tasks", "invalid"), bytes.NewBufferString(
+				fmt.Sprintf(createTaskPayloadFmt, validTaskName2)))
+
+			Convey("When the tasks endpoint is called to create and store a new reindex task", func() {
+				req.Header.Set("Content-Type", "application/json")
+				req.Header.Set("Authorization", validServiceAuthToken)
+				resp := httptest.NewRecorder()
+
+				apiInstance.Router.ServeHTTP(resp, req)
+
+				Convey("Then an empty search reindex job is returned with status code 404", func() {
+					So(resp.Code, ShouldEqual, http.StatusInternalServerError)
+					errMsg := strings.TrimSpace(resp.Body.String())
+					So(errMsg, ShouldEqual, apierrors.ErrInternalServer.Error())
+				})
 			})
 		})
 	})
@@ -164,12 +199,6 @@ func TestCreateTaskHandler(t *testing.T) {
 		})
 	})
 }
-
-// Create Task Payload
-var createTaskPayloadFmt = `{
-	"task_name": "%s",
-	"number_of_documents": 5
-}`
 
 func ExpectedTask(jobID string, lastUpdated time.Time, numberOfDocuments int, taskName string) (models.Task, error) {
 	cfg, err := config.Get()
