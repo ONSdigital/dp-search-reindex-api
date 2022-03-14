@@ -109,7 +109,7 @@ func TestCreateJobHandler(t *testing.T) {
 				newJob := models.Job{}
 				err = json.Unmarshal(payload, &newJob)
 				So(err, ShouldBeNil)
-				expectedJob, err := ExpectedJob(validJobID1, zeroTime, 0, zeroTime, zeroTime, zeroTime, "ons1638363874110115", "created", 0, 0)
+				expectedJob, err := expectedJob(validJobID1, zeroTime, 0, zeroTime, zeroTime, zeroTime, "ons1638363874110115", "created", 0, 0)
 				So(err, ShouldBeNil)
 
 				Convey("And the new job resource should contain expected default values", func() {
@@ -518,9 +518,9 @@ func TestGetJobsHandler(t *testing.T) {
 				jobsReturned := models.Jobs{}
 				err = json.Unmarshal(payload, &jobsReturned)
 				So(err, ShouldBeNil)
-				expectedJob1, err := ExpectedJob(validJobID1, zeroTime, 0, zeroTime, zeroTime, zeroTime, "Default Search Index Name", "created", 0, 0)
+				expectedJob1, err := expectedJob(validJobID1, zeroTime, 0, zeroTime, zeroTime, zeroTime, "Default Search Index Name", "created", 0, 0)
 				So(err, ShouldBeNil)
-				expectedJob2, err := ExpectedJob(validJobID2, zeroTime, 0, zeroTime, zeroTime, zeroTime, "Default Search Index Name", "created", 0, 0)
+				expectedJob2, err := expectedJob(validJobID2, zeroTime, 0, zeroTime, zeroTime, zeroTime, "Default Search Index Name", "created", 0, 0)
 				So(err, ShouldBeNil)
 
 				Convey("And the returned list should contain expected jobs", func() {
@@ -565,7 +565,7 @@ func TestGetJobsHandler(t *testing.T) {
 				jobsReturned := models.Jobs{}
 				err = json.Unmarshal(payload, &jobsReturned)
 				So(err, ShouldBeNil)
-				expectedJob, err := ExpectedJob(validJobID2, zeroTime, 0, zeroTime, zeroTime, zeroTime, "Default Search Index Name", "created", 0, 0)
+				expectedJob, err := expectedJob(validJobID2, zeroTime, 0, zeroTime, zeroTime, zeroTime, "Default Search Index Name", "created", 0, 0)
 				So(err, ShouldBeNil)
 
 				Convey("And the returned list should contain the expected job", func() {
@@ -853,8 +853,8 @@ func TestPutNumTasksHandler(t *testing.T) {
 	})
 }
 
-// ExpectedJob returns a Job resource that can be used to define and test expected values within it.
-func ExpectedJob(id string,
+// expectedJob returns a Job resource that can be used to define and test expected values within it.
+func expectedJob(id string,
 	lastUpdated time.Time,
 	numberOfTasks int,
 	reindexCompleted time.Time,
