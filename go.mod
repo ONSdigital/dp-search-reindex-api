@@ -2,6 +2,8 @@ module github.com/ONSdigital/dp-search-reindex-api
 
 go 1.17
 
+replace github.com/ONSdigital/dp-net/v2 v2.0.0 => ../dp-net
+
 require (
 	github.com/ONSdigital/dp-api-clients-go/v2 v2.98.0
 	github.com/ONSdigital/dp-authorisation v0.1.0

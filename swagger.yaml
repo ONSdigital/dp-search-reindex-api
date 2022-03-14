@@ -113,6 +113,9 @@ paths:
             ETag:
               type: string
               description: "A new unique version of the job resource after modification"
+        304:
+          //TO-DO: Add response definition for eTag 
+          $ref: '#/responses/InvalidRequest'
         400:
           $ref: '#/responses/InvalidRequest'
         404:
@@ -428,7 +431,7 @@ definitions:
         op:
           type: string
           description: The operation to be made
-          enum: [add, replace]
+          enum: [replace]
         path:
           type: string
           description: Path to value that needs to be operated on

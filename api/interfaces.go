@@ -8,6 +8,7 @@ import (
 	"github.com/ONSdigital/dp-authorisation/auth"
 	dpHTTP "github.com/ONSdigital/dp-net/v2/http"
 	"github.com/ONSdigital/dp-search-reindex-api/models"
+	"github.com/globalsign/mgo/bson"
 )
 
 //go:generate moq -out mock/data_storer.go -pkg mock . DataStorer
@@ -16,16 +17,17 @@ import (
 
 // DataStorer is an interface for a type that can store and retrieve jobs
 type DataStorer interface {
+	AcquireJobLock(ctx context.Context, id string) (lockID string, err error)
 	CreateJob(ctx context.Context, id string) (job models.Job, err error)
+	CreateTask(ctx context.Context, jobID string, taskName string, numDocuments int) (task models.Task, err error)
 	GetJob(ctx context.Context, id string) (job models.Job, err error)
 	GetJobs(ctx context.Context, offset int, limit int) (job models.Jobs, err error)
-	AcquireJobLock(ctx context.Context, id string) (lockID string, err error)
-	UnlockJob(lockID string) error
-	PutNumberOfTasks(ctx context.Context, id string, count int) error
-	CreateTask(ctx context.Context, jobID string, taskName string, numDocuments int) (task models.Task, err error)
 	GetTask(ctx context.Context, jobID string, taskName string) (task models.Task, err error)
 	GetTasks(ctx context.Context, offset int, limit int, jobID string) (job models.Tasks, err error)
+	PutNumberOfTasks(ctx context.Context, id string, count int) error
+	UnlockJob(lockID string) error
 	UpdateIndexName(indexName string, jobID string) error
+	UpdateJobWithPatches(jobID string, updates bson.M) error
 	UpdateJobState(state string, jobID string) error
 }
 

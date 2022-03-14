@@ -11,12 +11,39 @@ import (
 
 // Possible values of a job's state
 const (
-	JobStateCreated = "created" // this is the default value of state in a new job
-	JobStateFailed  = "failed"
+	JobCreatedState   = "created" // this is the default value of state in a new job
+	JobFailedState    = "failed"
+	JobCompletedState = "completed"
+)
+
+// ValidJobStates lists all the valid states for a job resource
+var ValidJobStates = map[string]int{
+	JobCreatedState:   1,
+	JobFailedState:    1,
+	JobCompletedState: 1,
+}
+
+// Paths of fields in a job resource
+const (
+	JobNoOfTasksPath            = "/number_of_tasks"
+	JobStatePath                = "/state"
+	JobTotalSearchDocumentsPath = "/total_search_documents"
+)
+
+// BSON keys for each field in the job resource so that there is a source of truth
+const (
+	JobETagBSONKey                 = "e_tag"
+	JobLastUpdatedBSONKey          = "last_updated"
+	JobReindexCompletedBSONKey     = "reindex_completed"
+	JobReindexFailedBSONKey        = "reindex_failed"
+	JobNoOfTasksBSONKey            = "number_of_tasks"
+	JobStateBSONKey                = "state"
+	JobTotalSearchDocumentsBSONKey = "total_search_documents"
 )
 
 // Job represents a job metadata model and json representation for API
 type Job struct {
+	ETag                         string    `bson:"e_tag"                            json:"-"`
 	ID                           string    `bson:"_id" json:"id"`
 	LastUpdated                  time.Time `bson:"last_updated" json:"last_updated"`
 	Links                        *JobLinks `bson:"links" json:"links"`
@@ -59,7 +86,7 @@ func NewJob(id string) (Job, error) {
 		ReindexFailed:                zeroTime,
 		ReindexStarted:               zeroTime,
 		SearchIndexName:              "Default Search Index Name",
-		State:                        JobStateCreated,
+		State:                        JobCreatedState,
 		TotalSearchDocuments:         0,
 		TotalInsertedSearchDocuments: 0,
 	}, nil
