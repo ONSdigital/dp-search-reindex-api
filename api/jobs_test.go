@@ -45,6 +45,42 @@ var (
 	zeroTime = time.Time{}.UTC()
 )
 
+// expectedJob returns a Job resource that can be used to define and test expected values within it.
+func expectedJob(id string,
+	lastUpdated time.Time,
+	numberOfTasks int,
+	reindexCompleted time.Time,
+	reindexFailed time.Time,
+	reindexStarted time.Time,
+	searchIndexName string,
+	state string,
+	totalSearchDocuments int,
+	totalInsertedSearchDocuments int) (models.Job, error) {
+	cfg, err := config.Get()
+	if err != nil {
+		return models.Job{}, fmt.Errorf("%s: %w", errors.New("unable to retrieve service configuration"), err)
+	}
+	urlBuilder := url.NewBuilder("http://" + cfg.BindAddr)
+	self := urlBuilder.BuildJobURL(id)
+	tasks := urlBuilder.BuildJobTasksURL(id)
+	return models.Job{
+		ID:          id,
+		LastUpdated: lastUpdated,
+		Links: &models.JobLinks{
+			Tasks: tasks,
+			Self:  self,
+		},
+		NumberOfTasks:                numberOfTasks,
+		ReindexCompleted:             reindexCompleted,
+		ReindexFailed:                reindexFailed,
+		ReindexStarted:               reindexStarted,
+		SearchIndexName:              searchIndexName,
+		State:                        state,
+		TotalSearchDocuments:         totalSearchDocuments,
+		TotalInsertedSearchDocuments: totalInsertedSearchDocuments,
+	}, err
+}
+
 func TestCreateJobHandler(t *testing.T) {
 	t.Parallel()
 
@@ -471,6 +507,8 @@ func TestGetJobHandler(t *testing.T) {
 }
 
 func TestGetJobsHandler(t *testing.T) {
+	t.Parallel()
+
 	Convey("Given a Search Reindex Job API that returns a list of jobs", t, func() {
 		dataStorerMock := &apiMock.DataStorerMock{
 			GetJobsFunc: func(ctx context.Context, offset int, limit int) (models.Jobs, error) {
@@ -675,6 +713,8 @@ func TestGetJobsHandler(t *testing.T) {
 }
 
 func TestGetJobsHandlerWithEmptyJobStore(t *testing.T) {
+	t.Parallel()
+
 	Convey("Given a Search Reindex Job API that returns an empty list of jobs", t, func() {
 		dataStorerMock := &apiMock.DataStorerMock{
 			GetJobsFunc: func(ctx context.Context, offset int, limit int) (models.Jobs, error) {
@@ -745,6 +785,7 @@ func TestGetJobsHandlerWithInternalServerError(t *testing.T) {
 
 func TestPutNumTasksHandler(t *testing.T) {
 	t.Parallel()
+
 	Convey("Given a Search Reindex Job API that updates the number of tasks for specific jobs using their id as a key", t, func() {
 		jobStoreMock := &apiMock.DataStorerMock{
 			PutNumberOfTasksFunc: func(ctx context.Context, id string, count int) error {
@@ -851,40 +892,4 @@ func TestPutNumTasksHandler(t *testing.T) {
 			})
 		})
 	})
-}
-
-// expectedJob returns a Job resource that can be used to define and test expected values within it.
-func expectedJob(id string,
-	lastUpdated time.Time,
-	numberOfTasks int,
-	reindexCompleted time.Time,
-	reindexFailed time.Time,
-	reindexStarted time.Time,
-	searchIndexName string,
-	state string,
-	totalSearchDocuments int,
-	totalInsertedSearchDocuments int) (models.Job, error) {
-	cfg, err := config.Get()
-	if err != nil {
-		return models.Job{}, fmt.Errorf("%s: %w", errors.New("unable to retrieve service configuration"), err)
-	}
-	urlBuilder := url.NewBuilder("http://" + cfg.BindAddr)
-	self := urlBuilder.BuildJobURL(id)
-	tasks := urlBuilder.BuildJobTasksURL(id)
-	return models.Job{
-		ID:          id,
-		LastUpdated: lastUpdated,
-		Links: &models.JobLinks{
-			Tasks: tasks,
-			Self:  self,
-		},
-		NumberOfTasks:                numberOfTasks,
-		ReindexCompleted:             reindexCompleted,
-		ReindexFailed:                reindexFailed,
-		ReindexStarted:               reindexStarted,
-		SearchIndexName:              searchIndexName,
-		State:                        state,
-		TotalSearchDocuments:         totalSearchDocuments,
-		TotalInsertedSearchDocuments: totalInsertedSearchDocuments,
-	}, err
 }

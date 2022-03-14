@@ -46,6 +46,8 @@ var createTaskPayloadFmt = `{
 }`
 
 func TestCreateTaskHandler(t *testing.T) {
+	t.Parallel()
+
 	dataStorerMock := &apiMock.DataStorerMock{
 		CreateTaskFunc: func(ctx context.Context, jobID string, taskName string, numDocuments int) (models.Task, error) {
 			emptyTask := models.Task{}
@@ -204,6 +206,8 @@ func TestCreateTaskHandler(t *testing.T) {
 }
 
 func TestGetTaskHandler(t *testing.T) {
+	t.Parallel()
+
 	dataStorerMock := &apiMock.DataStorerMock{
 		GetTaskFunc: func(ctx context.Context, jobID, taskName string) (models.Task, error) {
 			emptyTask := models.Task{}
@@ -334,6 +338,8 @@ func TestGetTaskHandler(t *testing.T) {
 }
 
 func TestGetTasksHandler(t *testing.T) {
+	t.Parallel()
+
 	dataStorerMock := &apiMock.DataStorerMock{
 		GetTaskFunc: func(ctx context.Context, jobID, taskName string) (models.Task, error) {
 			emptyTask := models.Task{}
