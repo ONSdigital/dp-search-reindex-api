@@ -58,6 +58,9 @@ func TestCreateJobHandler(t *testing.T) {
 				return models.Job{}, errors.New("an unexpected error occurred")
 			}
 		},
+		UpdateIndexNameFunc: func(indexName, jobID string) error {
+			return nil
+		},
 	}
 
 	indexerMock := &apiMock.IndexerMock{
@@ -93,7 +96,7 @@ func TestCreateJobHandler(t *testing.T) {
 			req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
 			resp := httptest.NewRecorder()
 
-			apiInstance.CreateJobHandler(resp, req)
+			apiInstance.Router.ServeHTTP(resp, req)
 
 			Convey("Then the newly created search reindex job is returned with status code 201", func() {
 				So(resp.Code, ShouldEqual, http.StatusCreated)
@@ -132,7 +135,7 @@ func TestCreateJobHandler(t *testing.T) {
 			req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
 			resp := httptest.NewRecorder()
 
-			apiInstance.CreateJobHandler(resp, req)
+			apiInstance.Router.ServeHTTP(resp, req)
 
 			Convey("Then an empty search reindex job is returned with status code 409 because an existing job is in progress", func() {
 				So(resp.Code, ShouldEqual, http.StatusConflict)
@@ -153,7 +156,7 @@ func TestCreateJobHandler(t *testing.T) {
 			req := httptest.NewRequest("POST", "http://localhost:25700/jobs", nil)
 			resp := httptest.NewRecorder()
 
-			apiInstance.CreateJobHandler(resp, req)
+			apiInstance.Router.ServeHTTP(resp, req)
 
 			Convey("Then an empty search reindex job is returned with status code 500", func() {
 				So(resp.Code, ShouldEqual, http.StatusInternalServerError)
@@ -186,6 +189,9 @@ func TestGetJobHandler(t *testing.T) {
 				default:
 					return "", nil
 				}
+			},
+			UnlockJobFunc: func(lockID string) {
+				// mock UnlockJob to do nothing
 			},
 		}
 
@@ -596,6 +602,9 @@ func TestPutNumTasksHandler(t *testing.T) {
 				default:
 					return "", nil
 				}
+			},
+			UnlockJobFunc: func(lockID string) {
+				// mock UnlockJob to do nothing
 			},
 		}
 
