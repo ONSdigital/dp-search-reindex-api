@@ -1,7 +1,6 @@
-package etag
+package models_test
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -10,13 +9,12 @@ import (
 )
 
 func TestGenerateETagForJobPatch(t *testing.T) {
-	testCtx := context.Background()
 	currentJob := getTestJob()
 
 	Convey("Given an existing job with no new job updates", t, func() {
 
 		Convey("When GenerateETagForJob is called", func() {
-			newETag, err := GenerateETagForJob(testCtx, currentJob)
+			newETag, err := models.GenerateETagForJob(currentJob)
 
 			Convey("Then an eTag is returned", func() {
 				So(newETag, ShouldNotBeEmpty)
@@ -37,7 +35,7 @@ func TestGenerateETagForJobPatch(t *testing.T) {
 		updatedJob.State = "completed"
 
 		Convey("When GenerateETagForJob is called", func() {
-			newETag, err := GenerateETagForJob(testCtx, updatedJob)
+			newETag, err := models.GenerateETagForJob(updatedJob)
 
 			Convey("Then a new eTag is created", func() {
 				So(newETag, ShouldNotBeEmpty)

@@ -74,7 +74,7 @@ func NewJob(id string) (Job, error) {
 	self := urlBuilder.BuildJobURL(id)
 	tasks := urlBuilder.BuildJobTasksURL(id)
 
-	return Job{
+	newJob := Job{
 		ID:          id,
 		LastUpdated: time.Now().UTC(),
 		Links: &JobLinks{
@@ -89,5 +89,13 @@ func NewJob(id string) (Job, error) {
 		State:                        JobCreatedState,
 		TotalSearchDocuments:         0,
 		TotalInsertedSearchDocuments: 0,
-	}, nil
+	}
+
+	jobETag, err := GenerateETagForJob(newJob)
+	if err != nil {
+		return Job{}, fmt.Errorf("%s: %w", errors.New("unable to generate eTag for new job"), err)
+	}
+	newJob.ETag = jobETag
+
+	return newJob, nil
 }

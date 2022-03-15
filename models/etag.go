@@ -1,22 +1,20 @@
-package etag
+package models
 
 import (
-	"context"
 	"time"
 
 	dpresponse "github.com/ONSdigital/dp-net/v2/handlers/response"
-	"github.com/ONSdigital/dp-search-reindex-api/models"
 	"github.com/globalsign/mgo/bson"
 )
 
 // GenerateETagForJob generates a new eTag for a job resource
-func GenerateETagForJob(ctx context.Context, updatedJob models.Job) (eTag string, err error) {
+func GenerateETagForJob(job Job) (eTag string, err error) {
 	// ignoring the metadata LastUpdated and currentEtag when generating new eTag
 	zeroTime := time.Time{}.UTC()
-	updatedJob.ETag = ""
-	updatedJob.LastUpdated = zeroTime
+	job.ETag = ""
+	job.LastUpdated = zeroTime
 
-	b, err := bson.Marshal(updatedJob)
+	b, err := bson.Marshal(job)
 	if err != nil {
 		return "", err
 	}
