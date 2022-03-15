@@ -9,20 +9,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Possible values of a job's state
-const (
-	JobCreatedState   = "created" // this is the default value of state in a new job
-	JobFailedState    = "failed"
-	JobCompletedState = "completed"
-)
-
-// ValidJobStates lists all the valid states for a job resource
-var ValidJobStates = map[string]int{
-	JobCreatedState:   1,
-	JobFailedState:    1,
-	JobCompletedState: 1,
-}
-
 // Paths of fields in a job resource
 const (
 	JobNoOfTasksPath            = "/number_of_tasks"

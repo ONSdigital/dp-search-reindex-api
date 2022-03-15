@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"math"
 	"net/http"
+	"reflect"
 	"strconv"
 	"time"
 
@@ -441,13 +442,13 @@ func PreparePatchUpdates(ctx context.Context, patches []dprequest.Patch, current
 	// prepare updates by iterating through patches
 	for _, patch := range patches {
 
-		if patch.Op == dprequest.OpReplace.String() {
+		if models.ValidPatchOpsMap[patch.Op] {
 
 			switch patch.Path {
 			case models.JobNoOfTasksPath:
 				noOfTasks, ok := patch.Value.(float64)
 				if !ok {
-					err = fmt.Errorf("wrong value type for `%s`, expected float64", patch.Path)
+					err = fmt.Errorf("wrong value type `%T` for `%s`, expected float64", reflect.TypeOf(patch.Value), patch.Path)
 					return models.Job{}, make(bson.M, 0), err
 				}
 
@@ -458,7 +459,7 @@ func PreparePatchUpdates(ctx context.Context, patches []dprequest.Patch, current
 			case models.JobStatePath:
 				state, ok := patch.Value.(string)
 				if !ok {
-					err = fmt.Errorf("wrong value type for %s, expected string", patch.Path)
+					err = fmt.Errorf("wrong value type `%T` for `%s`, expected string", reflect.TypeOf(patch.Value), patch.Path)
 					return models.Job{}, make(bson.M, 0), err
 				}
 
@@ -472,8 +473,8 @@ func PreparePatchUpdates(ctx context.Context, patches []dprequest.Patch, current
 					updatedJob.ReindexCompleted = currentTime
 				}
 
-				if models.ValidJobStates[state] != 1 {
-					err = fmt.Errorf("invalid job state `%s` for `%s` - expected created, failed or completed", state, patch.Path)
+				if models.ValidJobStatesMap[state] != 1 {
+					err = fmt.Errorf("invalid job state `%s` for `%s` - expected %v", state, patch.Path, models.ValidJobStates)
 					return models.Job{}, make(bson.M, 0), err
 				}
 
@@ -484,7 +485,7 @@ func PreparePatchUpdates(ctx context.Context, patches []dprequest.Patch, current
 			case models.JobTotalSearchDocumentsPath:
 				totalSearchDocs, ok := patch.Value.(float64)
 				if !ok {
-					err = fmt.Errorf("wrong value type for %s, expected float64", patch.Path)
+					err = fmt.Errorf("wrong value type `%T` for `%s`, expected float64", reflect.TypeOf(patch.Value), patch.Path)
 					return models.Job{}, make(bson.M, 0), err
 				}
 
@@ -498,7 +499,7 @@ func PreparePatchUpdates(ctx context.Context, patches []dprequest.Patch, current
 			}
 
 		} else {
-			err = fmt.Errorf("patch operation '%s' not allowed, expected '%s'", patch.Op, dprequest.OpReplace.String())
+			err = fmt.Errorf("patch operation '%s' not allowed, expected '%v'", patch.Op, models.ValidPatchOps)
 			return models.Job{}, make(bson.M, 0), err
 		}
 	}
