@@ -71,7 +71,7 @@ Feature: Posting a job
   Scenario: Job does not exist and an attempt to create a task for it returns a not found error
     Given I use a service auth token "validServiceAuthToken"
     And zebedee recognises the service auth token as valid
-    And no jobs have been generated in the Job Store
+    And I have generated 0 jobs in the Job Store
     And I POST "/jobs/any-job-id/tasks"
     """
     { "task_name": "dataset-api", "number_of_documents": 29 }

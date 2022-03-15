@@ -138,6 +138,6 @@ Feature: Getting a list of tasks
 
   Scenario: Job does not exist and a get request returns StatusNotFound
 
-    Given no jobs have been generated in the Job Store
+    Given I have generated 0 jobs in the Job Store
     When I GET "/jobs/a219584a-454a-4add-92c6-170359b0ee77/tasks"
     Then the HTTP status code should be "404"

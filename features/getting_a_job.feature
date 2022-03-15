@@ -22,7 +22,7 @@ Feature: Getting a job
 
   Scenario: Job does not exist in the Job Store and a get request returns StatusNotFound
 
-    Given no jobs have been generated in the Job Store
+    Given I have generated 0 jobs in the Job Store
     When I call GET /jobs/{"a219584a-454a-4add-92c6-170359b0ee77"} using a valid UUID
     Then the HTTP status code should be "404"
 
