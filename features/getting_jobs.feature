@@ -60,6 +60,7 @@ Feature: Getting a list of jobs
   Scenario: Three jobs exist and a get request with negative offset returns an error
 
     Given I have generated three jobs in the Job Store
+    And the search api is working correctly
     When I GET "/jobs?offset=-2"
     """
     """
@@ -68,6 +69,7 @@ Feature: Getting a list of jobs
   Scenario: Three jobs exist and a get request with negative limit returns an error
 
     Given I have generated three jobs in the Job Store
+    And the search api is working correctly
     When I GET "/jobs?limit=-3"
     """
     """
@@ -76,6 +78,7 @@ Feature: Getting a list of jobs
   Scenario: Three jobs exist and a get request with limit greater than the maximum returns an error
 
     Given I have generated three jobs in the Job Store
+    And the search api is working correctly
     When I GET "/jobs?limit=1001"
     """
     """

@@ -4,6 +4,7 @@ Feature: Getting a task
 
     Given I use a service auth token "validServiceAuthToken"
     And zebedee recognises the service auth token as valid
+    And the search api is working correctly
     And I have generated a job in the Job Store
     And I have created a task for the generated job
     """
@@ -29,6 +30,7 @@ Feature: Getting a task
   Scenario: Task does not exist in the tasks collection and a get task for job id request returns StatusNotFound
 
     Given no tasks have been created in the tasks collection
+    And the search api is working correctly
     And I have generated a job in the Job Store
     When I call GET /jobs/{id}/tasks/{"dataset-api"}
     Then the HTTP status code should be "404"

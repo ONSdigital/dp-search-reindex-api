@@ -449,7 +449,7 @@ func (f *JobsFeature) iHaveGeneratedAJobInTheJobStore() error {
 	return f.ErrorFeature.StepError()
 }
 
-// callPostJobs is a utility method that can be called by a feature step in order to call the POST jobs/ endpoint
+// callPostJobs is a utility method that can be called by a feature step in order to call the POST /jobs endpoint
 // Calling that endpoint results in the creation of a job, in the Job Store, containing a unique id and default values.
 func (f *JobsFeature) callPostJobs() error {
 	var emptyBody = godog.DocString{}
