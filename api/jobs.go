@@ -246,7 +246,7 @@ func (api *API) PutNumTasksHandler(w http.ResponseWriter, req *http.Request) {
 	}
 	defer api.unlockJob(ctx, lockID)
 
-	err = api.dataStore.PutNumberOfTasks(req.Context(), id, numTasks)
+	err = api.dataStore.PutNumberOfTasks(ctx, id, numTasks)
 	if err != nil {
 		log.Error(ctx, "putting number of tasks failed", err, logData)
 		if err == mongo.ErrJobNotFound {
